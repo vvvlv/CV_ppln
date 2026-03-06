@@ -1,0 +1,65 @@
+name: "exp_cfinet_soda"
+description: "CFINet object detection on SODA-A dataset"
+
+dataset: "configs/datasets/soda_a_05_small.yaml"
+
+# Data loading
+data:
+  batch_size: 1  # Reduced for GPU memory constraints (5.68 GiB GPU)
+  num_workers: 2
+  pin_memory: true
+  
+  augmentation:
+    enabled: true
+    horizontal_flip: 0.5
+    vertical_flip: 0.0
+    brightness: 0.1
+  
+  preprocessing:
+    normalize: true
+
+# Model architecture
+model:
+  type: "CFINet"
+  config_file: "/home/vlv/Documents/master/computervision/CFI/CFINet/configs/cfinet/faster_rcnn_r50_fpn_cfinet_1x.py"
+  checkpoint: null  # Set to checkpoint path if resuming training
+  num_classes: 9
+  device: "cuda"
+
+# Training settings
+training:
+  epochs: 12
+  optimizer:
+    type: "sgd"
+    learning_rate: 0.01
+    momentum: 0.9
+    weight_decay: 0.0001
+  scheduler:
+    type: "step"
+    step_size: 8
+    gamma: 0.1
+  metrics:
+    - "mAP"
+  checkpoint:
+    save_best: true
+    save_last: true
+    monitor: "val_loss"  # Monitor validation loss
+  early_stopping:
+    enabled: true
+    patience: 5
+    monitor: "val_loss"
+    mode: "min"
+
+# Output
+output:
+  dir: "outputs/experiments/exp_cfinet_soda"
+  save_predictions: true
+
+# Logging
+logging:
+  tensorboard: true
+  log_images: false
+  log_activations: false
+
+seed: 42
+device: "cuda"

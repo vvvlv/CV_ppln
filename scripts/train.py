@@ -102,8 +102,16 @@ def main(config_path: str):
         tb_logger = TensorBoardLogger(str(tb_log_dir), enabled=True)
     
     # Create trainer and train
+    # Check if this is a detection task
+    is_detection = config['dataset'].get('format') == 'coco' or 'annotation_file' in config['dataset']
+    
     try:
-        trainer = Trainer(model, train_loader, val_loader, config, device, tb_logger)
+        if is_detection:
+            from training.detection_trainer import DetectionTrainer
+            trainer = DetectionTrainer(model, train_loader, val_loader, config, device, tb_logger)
+        else:
+            from training.trainer import Trainer
+            trainer = Trainer(model, train_loader, val_loader, config, device, tb_logger)
         trainer.train()
     finally:
         # Ensure TensorBoard logger is properly closed

@@ -1,0 +1,24 @@
+name: "SODA_A_05_small"
+description: "SODA-A dataset small subset (COCO format)"
+
+format: "coco"  # Indicates this is a detection dataset
+
+paths:
+  root: "/home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_05_small"
+  train: "/home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_05_small/train"
+  val: "/home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_05_small/test"  # Using test as val
+  test: "/home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_05_small/test"
+
+annotation_file: "_annotations.coco.json"
+
+# Image preprocessing
+image_size: null  # Use original image size (or specify [H, W] to resize)
+num_channels: 3
+num_classes: 9  # SODA-A has 9 classes
+
+# Normalization (ImageNet stats)
+mean: [0.485, 0.456, 0.406]
+std: [0.229, 0.224, 0.225]
+
+# Minimum bbox size to keep (filter tiny boxes)
+min_bbox_size: 1
