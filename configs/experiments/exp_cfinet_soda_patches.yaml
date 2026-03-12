@@ -23,7 +23,7 @@ data:
 # Model architecture
 model:
   type: "CFINet"
-  config_file: null  # null = use default embedded config. Or provide path to custom config file.
+  config_file: null  # null = use default embedded config. Or provide path to custom config file. Do not touch this if you don't know what ur doing.
   checkpoint: null  # Set to checkpoint path if resuming training
   num_classes: 9
   device: "cuda"

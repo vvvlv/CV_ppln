@@ -2,8 +2,11 @@
 
 from .registry import register_model, get_model, list_models
 
-# Object detection (MMDetection / CFINet)
-from .architectures.cfinet import CFINetWrapper
+# Pure PyTorch CFINet
+from .architectures.cfinet_pytorch import CFINet
+
+# Register CFINet
+register_model('CFINet')(CFINet)
 
 
 def create_model(config: dict):

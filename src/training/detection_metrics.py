@@ -41,24 +41,24 @@ def calculate_ap(
     for i in range(len(gt_bboxes)):
         if len(gt_bboxes[i]) > 0:
             all_gt_boxes.extend(list(gt_bboxes[i]))
-
+    
     for i in range(len(pred_bboxes)):
         for j in range(len(pred_bboxes[i])):
             all_pred_boxes.append(pred_bboxes[i][j])
             all_pred_scores.append(float(pred_scores[i][j]) if len(pred_scores[i]) > j else 1.0)
-
+        
     if len(all_gt_boxes) == 0 or len(all_pred_boxes) == 0:
         return 0.0
-
+    
     # Sort predictions by score desc
     sorted_indices = np.argsort(all_pred_scores)[::-1]
     all_pred_boxes = np.asarray(all_pred_boxes, dtype=np.float32)[sorted_indices]
-
+    
     # Match predictions to GT (greedy 1-to-1)
     gt_matched = [False] * len(all_gt_boxes)
     tp = np.zeros((len(all_pred_boxes),), dtype=np.float32)
     fp = np.zeros((len(all_pred_boxes),), dtype=np.float32)
-
+    
     for k, pred_box in enumerate(all_pred_boxes):
         best_iou = 0.0
         best_gt_idx = -1
@@ -69,7 +69,7 @@ def calculate_ap(
             if iou > best_iou:
                 best_iou = iou
                 best_gt_idx = gt_idx
-
+        
         if best_iou >= iou_threshold and best_gt_idx >= 0:
             tp[k] = 1.0
             gt_matched[best_gt_idx] = True
@@ -80,13 +80,13 @@ def calculate_ap(
     fp_cum = np.cumsum(fp)
     recalls = tp_cum / (len(all_gt_boxes) + 1e-8)
     precisions = tp_cum / (tp_cum + fp_cum + 1e-8)
-
+    
     # 11-point interpolation AP
     ap = 0.0
     for t in np.arange(0.0, 1.1, 0.1):
         p = np.max(precisions[recalls >= t]) if np.any(recalls >= t) else 0.0
         ap += float(p) / 11.0
-
+    
     return float(ap)
 
 

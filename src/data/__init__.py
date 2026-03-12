@@ -37,6 +37,11 @@ def create_dataloaders(config: dict) -> Tuple[DataLoader, DataLoader, DataLoader
         print(f"  Expected: {val_annotation_path}")
         print("  To create a val split, run: python scripts/dataset/split_coco_dataset.py <train/_annotations.coco.json> --output-dir <root_dir> --val-ratio 0.2")
 
+    # Get max_samples from data config (for limiting dataset size during training)
+    max_train_samples = data_config.get('max_samples', None)
+    max_val_samples = data_config.get('max_val_samples', None)
+    max_test_samples = data_config.get('max_test_samples', None)
+    
     train_dataset = COCODataset(
         root_dir=root_dir,
         split=train_split,
@@ -46,7 +51,8 @@ def create_dataloaders(config: dict) -> Tuple[DataLoader, DataLoader, DataLoader
         std=dataset_config.get('std', [0.229, 0.224, 0.225]),
         normalize=data_config['preprocessing']['normalize'],
         augmentation=augmentation_config,
-        min_size=dataset_config.get('min_bbox_size', 1)
+        min_size=dataset_config.get('min_bbox_size', 1),
+        max_samples=max_train_samples
     )
 
     val_dataset = COCODataset(
@@ -58,7 +64,8 @@ def create_dataloaders(config: dict) -> Tuple[DataLoader, DataLoader, DataLoader
         std=dataset_config.get('std', [0.229, 0.224, 0.225]),
         normalize=data_config['preprocessing']['normalize'],
         augmentation={},  # No augmentation for val
-        min_size=dataset_config.get('min_bbox_size', 1)
+        min_size=dataset_config.get('min_bbox_size', 1),
+        max_samples=max_val_samples
     )
 
     test_dataset = COCODataset(
@@ -70,7 +77,8 @@ def create_dataloaders(config: dict) -> Tuple[DataLoader, DataLoader, DataLoader
         std=dataset_config.get('std', [0.229, 0.224, 0.225]),
         normalize=data_config['preprocessing']['normalize'],
         augmentation={},  # No augmentation for test
-        min_size=dataset_config.get('min_bbox_size', 1)
+        min_size=dataset_config.get('min_bbox_size', 1),
+        max_samples=max_test_samples
     )
     
     # Custom collate function for detection (handles variable number of bboxes)

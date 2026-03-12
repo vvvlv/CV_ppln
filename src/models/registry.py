@@ -20,7 +20,11 @@ def get_model(name: str, config: dict) -> nn.Module:
     if name not in _MODEL_REGISTRY:
         available = list(_MODEL_REGISTRY.keys())
         raise ValueError(f"Model '{name}' not found. Available: {available}")
-    return _MODEL_REGISTRY[name](config)
+    
+    model_class = _MODEL_REGISTRY[name]
+    # Create model instance - pass config dict directly
+    # Model classes should extract their own parameters from config
+    return model_class(**config)
 
 
 def list_models() -> list:

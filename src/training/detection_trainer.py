@@ -377,7 +377,7 @@ class DetectionTrainer:
         # Initialize best metric if needed
         if self.best_checkpoint_metric is None:
             self.best_checkpoint_metric = float('inf') if mode == 'min' else float('-inf')
-
+        
         # Save best
         if ckpt_cfg['save_best'] and self._is_better(current_metric, self.best_checkpoint_metric, mode):
             self.best_checkpoint_metric = current_metric
@@ -418,9 +418,9 @@ class DetectionTrainer:
             self.early_stop_counter = 0
             return False
 
-        self.early_stop_counter += 1
-        print(f"  → Early stopping: {self.early_stop_counter}/{es_cfg['patience']} (no improvement in {metric_name})")
-        return self.early_stop_counter >= es_cfg['patience']
+            self.early_stop_counter += 1
+            print(f"  → Early stopping: {self.early_stop_counter}/{es_cfg['patience']} (no improvement in {metric_name})")
+            return self.early_stop_counter >= es_cfg['patience']
     
     def _save_metrics_history(self):
         """Save metrics history to YAML file."""

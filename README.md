@@ -1,6 +1,6 @@
 # CV_ppln: Object Detection Pipeline for SODA-A with CFINet
 
-A comprehensive, streamlined deep learning pipeline for training and evaluating object detection models on the SODA-A dataset using CFINet (Coarse-to-fine Proposal Generation and Imitation Learning Network). This system is built on PyTorch and MMDetection, providing a complete workflow from data loading to model evaluation.
+A comprehensive, streamlined deep learning pipeline for training and evaluating object detection models on the SODA-A dataset using CFINet (Coarse-to-fine Proposal Generation and Imitation Learning Network). This system is built entirely on **pure PyTorch**, providing a complete workflow from data loading to model evaluation without any external detection framework dependencies.
 
 ---
 
@@ -25,12 +25,13 @@ A comprehensive, streamlined deep learning pipeline for training and evaluating 
 
 ### Purpose
 
-This pipeline is designed specifically for **object detection** tasks using **COCO-format datasets**. It integrates CFINet (an MMDetection-based detector) with a clean, modular training and evaluation framework. The system has been streamlined to focus exclusively on detection, removing all segmentation-related code paths.
+This pipeline is designed specifically for **object detection** tasks using **COCO-format datasets**. It implements CFINet as a **pure PyTorch model** with a clean, modular training and evaluation framework. The system is completely self-contained and doesn't require MMDetection or any other external detection frameworks.
 
 ### Key Features
 
+- **Pure PyTorch Implementation**: CFINet implemented entirely in PyTorch - no external dependencies
 - **COCO Dataset Support**: Native handling of COCO-format annotations
-- **CFINet Integration**: Seamless wrapper around MMDetection-based CFINet model
+- **Self-Contained**: All CFINet components embedded in the codebase
 - **Modular Design**: Clean separation between data, models, training, and evaluation
 - **Comprehensive Metrics**: mAP (mean Average Precision) calculation with per-class support
 - **TensorBoard Integration**: Real-time visualization of training metrics
@@ -41,6 +42,10 @@ This pipeline is designed specifically for **object detection** tasks using **CO
 ### Supported Datasets
 
 - **SODA-A**: Small Object Detection in Aerial imagery dataset (9 classes)
+  - **Note**: According to the SODA paper, SODA-A uses Oriented Bounding Boxes (OBB).
+    However, this pipeline uses Horizontal Bounding Boxes (HBB) for simplicity and compatibility
+    with standard COCO-format detection frameworks. The conversion from OBB to HBB is done during
+    dataset preparation.
 - Any COCO-format dataset with proper directory structure
 
 ---
@@ -82,118 +87,76 @@ The system follows this end-to-end workflow:
     │ Split COCO Format                                      │
     │   train/_annotations.coco.json (70%)                  │
     │   test/_annotations.coco.json (15%)                    │
-    │   val/_annotations.coco.json (15%)                      │
+    │   val/_annotations.coco.json (15%)                     │
     └──────────────────────────────────────────────────────┘
                               │
                               │ [create_patched_dataset.py]
                               │ (Optional: create patches)
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Patched COCO Format (512x512 max patches)             │
+    │ Patched COCO Format (512x512 max patches)              │
     │   train_patches/_annotations.coco.json                 │
-    │   val_patches/_annotations.coco.json                  │
-    │   test_patches/_annotations.coco.json                 │
+    │   val_patches/_annotations.coco.json                   │
+    │   test_patches/_annotations.coco.json                  │
     └──────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ 2. CONFIGURATION SETUP                                          │
-│    (Define experiment and dataset configs)                      │
+│ 2. CONFIGURATION                                                │
+│    (Experiment + Dataset configs)                               │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Experiment Config (exp_cfinet_soda_512_patches.yaml)  │
-    │   - References dataset config                          │
-    │   - Defines training hyperparameters                   │
-    │   - Specifies model type and settings                 │
+    │ Experiment Config (YAML)                              │
+    │   - Model type: CFINet                                 │
+    │   - Training hyperparameters                           │
+    │   - Dataset reference                                   │
     └──────────────────────────────────────────────────────┘
                               │
-                              │ [load_config()]
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Dataset Config (soda_a_coco_512_patches.yaml)        │
-    │   - Defines dataset paths                             │
-    │   - Specifies image preprocessing                     │
-    │   - Sets number of classes                            │
-    └──────────────────────────────────────────────────────┘
-                              │
-                              │ [Merged into single config]
-                              ▼
-    ┌──────────────────────────────────────────────────────┐
-    │ Complete Config Dictionary                            │
-    │   {dataset: {...}, model: {...}, training: {...}, ...}│
+    │ Dataset Config (YAML)                                  │
+    │   - Dataset paths                                      │
+    │   - Image preprocessing                                │
+    │   - Number of classes                                  │
     └──────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ 3. DATA LOADING PIPELINE                                         │
-│    (During training initialization)                             │
+│ 3. DATA LOADING                                                 │
+│    (COCODataset → DataLoader)                                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ COCODataset.__init__()                                │
-    │   - Loads _annotations.coco.json                     │
-    │   - Builds image_id → annotations mapping            │
-    │   - Filters images with no annotations (train only)   │
+    │ COCODataset                                            │
+    │   - Loads COCO JSON annotations                        │
+    │   - Loads images                                        │
+    │   - Applies preprocessing (resize, normalize)         │
+    │   - Applies augmentations (flip, brightness)           │
+    │   - Converts bboxes: [x,y,w,h] → [x1,y1,x2,y2]        │
     └──────────────────────────────────────────────────────┘
                               │
-                              │ [Per sample: __getitem__()]
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Image Loading & Preprocessing                          │
-    │   1. Load image from disk (OpenCV)                    │
-    │   2. Extract bboxes and labels from annotations       │
-    │   3. Convert COCO bbox [x,y,w,h] → [x1,y1,x2,y2]     │
-    │   4. Filter tiny bboxes (< min_bbox_size)             │
-    │   5. Apply augmentations (if training)               │
-    │   6. Resize image (if image_size specified)          │
-    │   7. Adjust bbox coordinates for resize               │
-    │   8. Normalize image (ImageNet stats)                │
-    │   9. Convert to PyTorch tensors                       │
-    └──────────────────────────────────────────────────────┘
-                              │
-                              │ [DataLoader collate_fn()]
-                              ▼
-    ┌──────────────────────────────────────────────────────┐
-    │ Batch Dictionary                                      │
-    │   {                                                    │
-    │     'image': Tensor[B, C, H, W],                      │
-    │     'bboxes': List[List[4]],  # Variable length      │
-    │     'labels': List[List[int]], # Variable length      │
-    │     'image_id': List[int],                            │
-    │     'image_name': List[str],                          │
-    │     'original_size': List[Tuple[H, W]]                │
-    │   }                                                    │
+    │ DataLoader                                             │
+    │   - Batches samples                                    │
+    │   - Handles variable-length bboxes/labels             │
+    │   - Multi-process loading                              │
     └──────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
 │ 4. MODEL INITIALIZATION                                         │
-│    (During training initialization)                             │
+│    (Pure PyTorch CFINet)                                        │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ create_model(config)                                  │
-    │   - Looks up model type in registry                   │
-    │   - Creates CFINetWrapper instance                    │
-    └──────────────────────────────────────────────────────┘
-                              │
-                              ▼
-    ┌──────────────────────────────────────────────────────┐
-    │ CFINetWrapper.__init__()                              │
-    │   1. Loads MMDetection config (embedded or file)     │
-    │   2. Updates num_classes in config                     │
-    │   3. Creates con_queue_dir for FIRoIHead              │
-    │   4. Builds model via mmdet.models.build_detector()   │
-    │   5. Loads pretrained weights (if checkpoint provided)│
-    └──────────────────────────────────────────────────────┘
-                              │
-                              ▼
-    ┌──────────────────────────────────────────────────────┐
-    │ CFINet Model (MMDetection)                            │
-    │   - ResNet-50 Backbone + FPN                         │
-    │   - CRPNHead (Coarse-to-fine RPN)                     │
-    │   - FIRoIHead (Feature Imitation ROI Head)           │
+    │ CFINet Model (Pure PyTorch)                            │
+    │   - ResNet-50 Backbone (pretrained)                    │
+    │   - FPN (Feature Pyramid Network)                     │
+    │   - CRPNHead (Coarse-to-fine RPN Head)                 │
+    │   - DynamicAssigner (Anchor assignment)                │
+    │   - RoIHead (Feature Imitation ROI Head)              │
     └──────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -203,71 +166,70 @@ The system follows this end-to-end workflow:
                               │
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ DetectionTrainer.train()                              │
-    │   - Initializes optimizer (SGD/Adam)                 │
-    │   - Initializes scheduler (Step/Cosine)              │
-    │   - Sets up metrics tracking                          │
+    │ DetectionTrainer.train()                               │
+    │   - Initializes optimizer (SGD/Adam)                    │
+    │   - Initializes scheduler (Step/Cosine)                 │
+    │   - Sets up metrics tracking                           │
     └──────────────────────────────────────────────────────┘
                               │
                               │ [For each epoch]
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Training Phase (model.train())                       │
-    │   For each batch:                                    │
-    │     1. Move images and targets to device             │
-    │     2. Forward pass: model(images, targets=targets)   │
-    │     3. Get loss dict from MMDetection                │
-    │     4. Aggregate losses (sum all components)         │
-    │     5. Backward pass: loss.backward()                │
-    │     6. Optimizer step: optimizer.step()              │
-    │     7. Log loss components                            │
+    │ Training Phase (model.train())                         │
+    │   For each batch:                                      │
+    │     1. Move images and targets to device              │
+    │     2. Forward pass: model(images, targets=targets)    │
+    │     3. Get loss dict from model                       │
+    │     4. Aggregate losses (sum all components)           │
+    │     5. Backward pass: loss.backward()                  │
+    │     6. Optimizer step: optimizer.step()                │
+    │     7. Log loss components                             │
     └──────────────────────────────────────────────────────┘
                               │
                               │ [After training phase]
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Validation Phase (model.eval())                      │
-    │   For each batch:                                    │
-    │     1. Forward pass (no gradients)                    │
-    │     2. Compute losses                                │
-    │     3. Collect predictions and ground truth           │
-    │     4. Compute metrics (mAP)                          │
+    │ Validation Phase (model.eval())                        │
+    │   For each batch:                                      │
+    │     1. Forward pass (no gradients)                     │
+    │     2. Compute losses                                  │
+    │     3. Collect predictions and ground truth             │
+    │     4. Compute metrics (mAP)                            │
     └──────────────────────────────────────────────────────┘
                               │
                               │ [After validation]
                               ▼
     ┌──────────────────────────────────────────────────────┐
     │ Post-Epoch Operations                                 │
-    │   1. Log metrics to TensorBoard                       │
-    │   2. Save metrics_history.yaml                        │
-    │   3. Checkpointing:                                   │
-    │      - Save best.pth if metric improved               │
-    │      - Save last.pth (every epoch)                   │
-    │   4. Early stopping check                             │
-    │   5. Step learning rate scheduler                     │
+    │   1. Log metrics to TensorBoard                        │
+    │   2. Save metrics_history.yaml                         │
+    │   3. Checkpointing:                                    │
+    │      - Save best.pth if metric improved                │
+    │      - Save last.pth (every epoch)                     │
+    │   4. Early stopping check                              │
+    │   5. Step learning rate scheduler                      │
     └──────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
 │ 6. INFERENCE / TESTING                                          │
-│    (After training, on test set)                               │
+│    (After training, on test set)                              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Load Trained Model                                    │
-    │   - Load checkpoint (best.pth or last.pth)           │
-    │   - Restore model weights                             │
-    │   - Set model.eval()                                  │
+    │ Load Trained Model                                     │
+    │   - Load checkpoint (best.pth or last.pth)             │
+    │   - Restore model weights                              │
+    │   - Set model.eval()                                   │
     └──────────────────────────────────────────────────────┘
                               │
                               │ [For each test batch]
                               ▼
     ┌──────────────────────────────────────────────────────┐
-    │ Inference                                             │
-    │   1. Forward pass: model.predict(images)              │
-    │   2. MMDetection returns detections                    │
-    │   3. Format to pipeline format:                      │
-    │      {bboxes: [N,4], labels: [N], scores: [N]}       │
+    │ Inference                                              │
+    │   1. Forward pass: model.predict(images)               │
+    │   2. Model returns detections                          │
+    │   3. Format: {bboxes: [N,4], labels: [N], scores: [N]}│
     │   4. Filter by score_threshold                        │
     └──────────────────────────────────────────────────────┘
                               │
@@ -275,9 +237,9 @@ The system follows this end-to-end workflow:
                               ▼
     ┌──────────────────────────────────────────────────────┐
     │ Evaluation                                            │
-    │   1. Collect all predictions and ground truth         │
-    │   2. Compute mAP (mean Average Precision)            │
-    │   3. Save predictions.json with results               │
+    │   1. Collect all predictions and ground truth          │
+    │   2. Compute mAP (mean Average Precision)              │
+    │   3. Save predictions.json with results                │
     └──────────────────────────────────────────────────────┘
 ```
 
@@ -316,6 +278,7 @@ When you run `./train.sh exp_cfinet_soda_512_patches`, the system:
     'model': {
         'type': 'CFINet',
         'num_classes': 9,
+        'pretrained': True,
         ...
     },
     'training': {
@@ -400,71 +363,81 @@ batch = [
 **Training mode (`model(images, targets=targets)`):**
 
 ```python
-# In CFINetWrapper.forward()
-1. Prepare img_metas (MMDetection format):
-   [
-       {'img_shape': (512, 512), 'ori_shape': (4800, 4800), ...},
-       {'img_shape': (512, 512), 'ori_shape': (4800, 3670), ...},
-       ...
-   ]
+# In CFINet.forward()
+1. Extract features from ResNet-50 backbone:
+   - C2, C3, C4, C5 feature maps
 
-2. Prepare gt_bboxes and gt_labels:
-   gt_bboxes = [bboxes[0], bboxes[1], ...]  # List of tensors
-   gt_labels = [labels[0], labels[1], ...]  # List of tensors
+2. Pass through FPN:
+   - P2, P3, P4, P5, P6 feature maps
 
-3. Call MMDetection model:
-   loss_dict = model.forward_train(
-       img=[images],  # List of tensors
-       img_metas=[img_metas],
-       gt_bboxes=gt_bboxes,
-       gt_labels=gt_labels
-   )
+3. Generate anchors for all FPN levels
 
-4. MMDetection returns:
-   {
-       'loss_rpn_cls': Tensor,
-       'loss_rpn_bbox': Tensor,
-       'loss_cls': Tensor,
-       'loss_bbox': Tensor,
-       'loss_imitation': Tensor,  # CFINet-specific
-       ...
-   }
+4. RPN forward (CRPNHead):
+   - Coarse regression predictions
+   - Fine classification predictions
+   - Fine regression predictions
 
-5. Return loss_dict to trainer
+5. Assign anchors to ground truth (DynamicAssigner):
+   - Compute IoU between anchors and GT boxes
+   - Dynamic threshold based on object size
+   - Assign positive/negative labels
+
+6. Compute RPN losses:
+   - Coarse regression loss (Smooth L1)
+   - Fine classification loss (Binary Cross-Entropy)
+   - Fine regression loss (Smooth L1)
+
+7. Generate proposals from RPN predictions
+
+8. ROI Head forward:
+   - Extract ROI features using ROI Align
+   - Classification predictions
+   - Regression predictions
+   - Feature imitation (contrastive learning)
+
+9. Compute ROI losses:
+   - Classification loss (Cross-Entropy)
+   - Regression loss (Smooth L1)
+   - Contrastive loss (Feature Imitation)
+
+10. Return loss dictionary:
+    {
+        'loss_rpn_coarse': Tensor,
+        'loss_rpn_fine_cls': Tensor,
+        'loss_rpn_fine_reg': Tensor,
+        'loss_cls': Tensor,
+        'loss_bbox': Tensor,
+        'contrastive_loss': Tensor
+    }
 ```
 
 **Inference mode (`model.predict(images)`):**
 
 ```python
-# In CFINetWrapper.predict()
-1. Prepare img_metas (same as training)
+# In CFINet.predict()
+1. Set model to eval mode: model.eval()
 
-2. Call MMDetection model:
-   results = model.simple_test(
-       img=[images],
-       img_metas=[img_metas]
-   )
+2. Forward pass (no gradients):
+   - Extract features (ResNet-50 + FPN)
+   - Generate anchors
+   - RPN forward → proposals
+   - ROI Head forward → detections
 
-3. MMDetection returns:
+3. Post-process:
+   - Apply softmax to classification logits
+   - Filter by confidence threshold
+   - Apply NMS (Non-Maximum Suppression)
+   - Format results
+
+4. Return formatted results:
    [
-       [  # Per image
-           [bbox1, bbox2, ...],  # Bboxes in [x1, y1, x2, y2, score] format
-           [label1, label2, ...],  # Labels
-           [score1, score2, ...]   # Scores
-       ],
-       ...
+       {
+           'bboxes': np.array([N, 4]),  # [x1, y1, x2, y2]
+           'labels': np.array([N]),
+           'scores': np.array([N])
+       },
+       ...  # One per image in batch
    ]
-
-4. Format to pipeline format:
-   {
-       'bboxes': np.array([N, 4]),  # [x1, y1, x2, y2]
-       'labels': np.array([N]),
-       'scores': np.array([N])
-   }
-
-5. Filter by score_threshold
-
-6. Return formatted results
 ```
 
 #### 4. Training Loop Details
@@ -533,126 +506,20 @@ for epoch in range(num_epochs):
     tb_logger.log_scalar('val/loss', mean(val_losses), epoch)
     tb_logger.log_scalar('val/mAP', val_mAP, epoch)
     
-    # Save metrics history
-    metrics_history[epoch] = {
-        'train_loss': mean(train_losses),
-        'val_loss': mean(val_losses),
-        'val_mAP': val_mAP
-    }
+    # Save checkpoint if improved
+    if val_mAP > best_mAP:
+        save_checkpoint('best.pth')
     
-    # Checkpointing
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        save_checkpoint('best.pth', epoch, model, optimizer, best_val_loss)
-    
-    save_checkpoint('last.pth', epoch, model, optimizer, best_val_loss)
-    
-    # Early stopping
-    if no_improvement_for >= patience:
-        print("Early stopping triggered")
+    # Early stopping check
+    if early_stopping.should_stop(val_mAP):
         break
-    
-    # Step scheduler
-    scheduler.step()
 ```
-
-### Dataset Preparation Pipeline (512 Patches)
-
-The `prepare_dataset.sh` script automates the complete dataset preparation workflow:
-
-**Step 1: Convert per-image JSON to COCO format**
-```bash
-# For each split (train, test, val)
-python convert_soda_a_to_coco.py \
-    Annotations/train/ \
-    --output-file temp_train.coco.json \
-    --split train
-```
-
-**What happens:**
-- Reads all `*.json` files in `Annotations/train/`
-- Sorts files by name (for reproducibility)
-- Converts polygon annotations to bounding boxes
-- Merges into single COCO JSON file
-- Sorts images, annotations, categories by ID (for reproducibility)
-
-**Step 2: Combine and split**
-```bash
-# Combine all splits into one
-python -c "
-    # Merge train, test, val COCO files into all_annotations.coco.json
-"
-
-# Split into 70/15/15
-python split_coco_three_way.py \
-    all_annotations.coco.json \
-    --output-dir OUTPUT_DIR \
-    --train-ratio 0.70 \
-    --test-ratio 0.15 \
-    --val-ratio 0.15 \
-    --seed 42 \
-    --copy-images
-```
-
-**What happens:**
-- Loads combined COCO file
-- Randomly shuffles image IDs (with seed for reproducibility)
-- Splits into train (70%), test (15%), val (15%)
-- Creates new COCO JSON files for each split
-- Copies images to respective split directories
-
-**Step 3: Create patches**
-```bash
-# For each split
-python create_patched_dataset.py \
-    train/_annotations.coco.json \
-    --output-file train_patches/_annotations.coco.json \
-    --patches-x 10 \
-    --patches-y 10 \
-    --min-overlap 0.1 \
-    --image-dir train \
-    --output-image-dir train_patches
-```
-
-**What happens:**
-- For each image:
-  1. Calculate patch grid: `patches_x = ceil(image_width / MAX_PATCH_SIZE)`
-  2. Calculate patch size with overlap
-  3. For each patch:
-     - Extract patch region from image
-     - Transform bbox coordinates: `bbox_patch = bbox_original - [patch_x, patch_y, 0, 0]`
-     - Calculate IoU between bbox and patch region
-     - Keep bbox if IoU >= min_overlap_ratio
-     - Clip bbox to patch boundaries
-     - Save patch image
-     - Create patch annotation entry
-  4. Save all patch annotations to new COCO JSON file
-
-**Result:**
-- Original image: 4800x4800 → 100 patches (10x10 grid) of ~480x480 each
-- Each patch has transformed bbox coordinates relative to patch
-- Patches are saved as separate images
-- New COCO annotation file references patch images
-
-### Key Design Decisions
-
-1. **Two-level config system**: Separates dataset-specific settings from training hyperparameters, allowing reuse of dataset configs across experiments.
-
-2. **Custom split names**: Supports `train_patches`, `val_patches`, etc., allowing multiple dataset variants in the same directory structure.
-
-3. **Variable-length bboxes**: Uses lists instead of padded tensors, avoiding memory waste and simplifying code.
-
-4. **MMDetection integration**: Wraps MMDetection models rather than reimplementing, leveraging their optimized implementations.
-
-5. **Reproducibility**: All scripts sort inputs/outputs deterministically, ensuring identical results across runs.
-
-6. **Flexible image sizing**: Supports both original-size and fixed-size images, with automatic bbox coordinate adjustment.
 
 ---
 
 ## System Architecture
 
-### High-Level Flow
+The system follows a modular architecture with clear separation of concerns:
 
 ```
 ┌─────────────────┐
@@ -671,7 +538,7 @@ python create_patched_dataset.py \
          │
          ▼
 ┌─────────────────┐
-│  Model Builder  │  (CFINetWrapper from MMDetection)
+│  Model Builder  │  (CFINet - Pure PyTorch)
 └────────┬────────┘
          │
          ▼
@@ -701,21 +568,22 @@ python create_patched_dataset.py \
   - Converts COCO bbox format `[x, y, w, h]` to `[x1, y1, x2, y2]`
   - Filters out tiny bounding boxes below minimum size threshold
 - **DataLoader Factory** (`__init__.py`): Creates train/val/test DataLoaders
-  - Custom collate function for variable-length bbox lists
   - Configurable batch size, workers, pin_memory
 
 #### 3. **Model System** (`src/models/`)
 - **Model Registry** (`registry.py`): Decorator-based registration system
-- **CFINet Wrapper** (`architectures/cfinet.py`): 
-  - Wraps MMDetection's CFINet implementation
-  - Handles MMDetection config loading and model building
-  - Provides unified interface for training/inference
-  - Manages CFINet-specific requirements (e.g., `con_queue_dir`)
+- **CFINet Model** (`architectures/cfinet_pytorch.py`): 
+  - Pure PyTorch implementation of CFINet
+  - ResNet-50 backbone with FPN
+  - CRPNHead (Coarse-to-fine RPN)
+  - DynamicAssigner for anchor assignment
+  - RoIHead with Feature Imitation
+  - Completely self-contained - no external dependencies
 
 #### 4. **Training System** (`src/training/`)
 - **DetectionTrainer** (`detection_trainer.py`): Main training loop
   - Epoch-based training with validation
-  - Loss aggregation from MMDetection loss dict
+  - Loss aggregation from model loss dict
   - Optimizer and scheduler management
   - Checkpointing (best/last based on monitored metric)
   - Early stopping with configurable patience
@@ -756,20 +624,21 @@ This installs all required dependencies:
 - torchvision 0.23.0+
 - numpy, opencv-python, pyyaml, tqdm
 - tensorboard
-- MMDetection (mmcv-full>=1.5.0, mmdet>=2.26.0)
 
-**Note**: The system is self-contained. MMDetection is installed via `requirements.txt`, and CFINet model configurations are loaded from config files (no separate CFINet package installation needed).
+**Note**: 
+- The system is **completely self-contained** - no MMDetection or other external detection frameworks needed
+- CFINet is implemented entirely in PyTorch within this codebase
+- All model components are in `src/models/architectures/cfinet_pytorch.py`
 
 #### 2. Verify Installation
 
 ```bash
 python -c "
 import torch
-import mmdet
-from mmcv import Config
+import torchvision
 print(f'PyTorch: {torch.__version__}')
 print(f'CUDA available: {torch.cuda.is_available()}')
-print(f'MMDetection: {mmdet.__version__}')
+print(f'torchvision: {torchvision.__version__}')
 "
 ```
 
@@ -777,7 +646,7 @@ Expected output:
 ```
 PyTorch: 2.8.0
 CUDA available: True
-MMDetection: 2.26.0
+torchvision: 0.23.0
 ```
 
 ### Virtual Environment (Recommended)
@@ -802,23 +671,23 @@ The pipeline uses a **two-level configuration system**: dataset configs and expe
 
 Located in `configs/datasets/`, these files define dataset-specific settings:
 
-**Example: `configs/datasets/soda_a_05_small.yaml`**
+**Example: `configs/datasets/soda_a_coco_512_patches.yaml`**
 ```yaml
-name: "SODA_A_05_small"
-description: "SODA-A dataset small subset (COCO format)"
+name: "SODA_A_coco_512_patches"
+description: "SODA-A dataset with 512x512 max patches (COCO format)"
 
 format: "coco"  # Indicates COCO-format detection dataset
 
 paths:
-  root: "/path/to/SODA_dataset/SODA_A_05_small"
-  train: "/path/to/SODA_dataset/SODA_A_05_small/train"
-  val: "/path/to/SODA_dataset/SODA_A_05_small/test"  # Using test as val
-  test: "/path/to/SODA_dataset/SODA_A_05_small/test"
+  root: "/path/to/SODA_dataset/SODA_A_coco_512"
+  train: "train_patches"
+  val: "val_patches"
+  test: "test_patches"
 
 annotation_file: "_annotations.coco.json"  # COCO annotation file name
 
 # Image preprocessing
-image_size: null  # Use original size, or [H, W] to resize
+image_size: [512, 512]  # Resize all images to this size
 num_channels: 3
 num_classes: 9  # SODA-A has 9 object classes
 
@@ -830,120 +699,86 @@ std: [0.229, 0.224, 0.225]
 min_bbox_size: 1
 ```
 
-**Key Fields:**
-- `format: "coco"`: Required to trigger detection pipeline
-- `paths.root`: Root directory containing train/val/test splits
-- `annotation_file`: Name of COCO JSON file in each split directory
-- `image_size`: `null` for original size, or `[height, width]` to resize
-- `num_classes`: Number of object classes in the dataset
-
 ### Experiment Configuration
 
-Located in `configs/experiments/`, these files define training hyperparameters and model settings:
+Located in `configs/experiments/`, these files define training experiments:
 
-**Example: `configs/experiments/exp_cfinet_soda.yaml`**
+**Example: `configs/experiments/exp_cfinet_soda_512_patches.yaml`**
 ```yaml
-name: "exp_cfinet_soda"
-description: "CFINet object detection on SODA-A dataset"
+name: "exp_cfinet_soda_512_patches"
+description: "CFINet on SODA-A with 512x512 patches"
 
-# Reference to dataset config (relative to project root)
-dataset: "configs/datasets/soda_a_05_small.yaml"
+dataset: "configs/datasets/soda_a_coco_512_patches.yaml"
 
 # Data loading
 data:
-  batch_size: 1  # Adjust based on GPU memory
-  num_workers: 2
+  batch_size: 4
+  num_workers: 4
   pin_memory: true
+  
+  # Limit dataset size for faster training/testing (optional)
+  max_samples: 70  # Limit training samples
+  max_val_samples: 15
+  max_test_samples: 15
   
   augmentation:
     enabled: true
     horizontal_flip: 0.5
-    vertical_flip: 0.0
     brightness: 0.1
-  
-  preprocessing:
-    normalize: true
 
 # Model architecture
 model:
-  type: "CFINet"  # Must match registered model name
-  config_file: null  # null = use default embedded config. Or provide path to custom config file.
-  checkpoint: null  # Optional: path to pretrained checkpoint
+  type: "CFINet"
   num_classes: 9
-  device: "cuda"
+  pretrained: true  # Use pretrained ResNet-50
 
 # Training settings
 training:
   epochs: 12
   optimizer:
-    type: "sgd"  # or "adam"
+    type: "sgd"
     learning_rate: 0.01
     momentum: 0.9
     weight_decay: 0.0001
   scheduler:
-    type: "step"  # or "cosine"
+    type: "step"
     step_size: 8
     gamma: 0.1
-  metrics:
-    - "mAP"
   checkpoint:
     save_best: true
     save_last: true
-    monitor: "val_loss"  # Metric to monitor for best checkpoint
+    monitor: "val_loss"
+    mode: "min"
   early_stopping:
     enabled: true
     patience: 5
     monitor: "val_loss"
-    mode: "min"  # "min" for loss, "max" for mAP
+    mode: "min"
 
 # Output
 output:
-  dir: "outputs/experiments/exp_cfinet_soda"
+  dir: "outputs/experiments/exp_cfinet_soda_512_patches"
   save_predictions: true
-
-# Logging
-logging:
-  tensorboard: true
-  log_images: false
-  log_activations: false
 
 seed: 42
 device: "cuda"
 ```
 
-**Key Fields:**
-- `dataset`: Path to dataset config (relative to project root)
-- `model.config_file`: Optional path to custom MMDetection config file. If `null`, uses the default embedded config from `cfinet.py`. If provided, can be relative to `src/models/architectures/` or absolute path.
-- `model.num_classes`: Must match dataset `num_classes`
-- `training.checkpoint.monitor`: Metric to track for best checkpoint
-- `training.early_stopping.mode`: `"min"` for loss, `"max"` for mAP
+### Limiting Dataset Size
 
-### Model Configuration
+For faster training/testing iterations, you can limit the number of samples used:
 
-Model definitions are embedded directly in the model architecture implementations in `src/models/architectures/`.
+```yaml
+data:
+  max_samples: 1000  # Use only first 1000 training samples
+  max_val_samples: 200
+  max_test_samples: 200
+```
 
-**CFINet Model:**
-- The CFINet model is defined in `src/models/architectures/cfinet.py`
-- Defines CFINet architecture: ResNet-50 backbone, FPN neck, CRPNHead, FIRoIHead
-- Contains model, training, and testing configurations
-- `num_classes` is automatically set from the experiment config
-- No external config files needed
-
-**Key Features:**
-- Self-contained: Model definition is embedded in the model implementation
-- All model specifications are within the project, in the architectures folder
-- Each model architecture file defines its own model (CFINet, or future models)
-- Optional: You can still provide a custom `config_file` path if you want to override the model's built-in config
-
-### How Configs Are Loaded
-
-1. **Experiment config** is loaded from YAML file
-2. **Dataset reference** (`dataset: "configs/datasets/..."`) is resolved relative to project root
-3. **Dataset config** is loaded and merged into experiment config
-4. **Model config** path (`model.config_file`) is resolved relative to project root
-5. Final merged config is used throughout the pipeline
-
-The config loaders automatically find the project root (directory containing `configs/`) and resolve relative paths correctly.
+This is useful for:
+- Quick debugging and testing
+- Reducing training time during development
+- Testing on smaller subsets
 
 ---
 
@@ -951,33 +786,12 @@ The config loaders automatically find the project root (directory containing `co
 
 ### COCO Dataset Format
 
-The pipeline expects COCO-format datasets with this directory structure:
-
-```
-<SODA_ROOT>/
-├── train/
-│   ├── _annotations.coco.json
-│   ├── image001.jpg
-│   ├── image002.jpg
-│   └── ...
-├── val/                      # Optional (if missing, test is used as val)
-│   ├── _annotations.coco.json
-│   ├── image101.jpg
-│   └── ...
-└── test/
-    ├── _annotations.coco.json
-    ├── image201.jpg
-    └── ...
-```
-
-### COCO Annotation Format
-
-Each `_annotations.coco.json` file must follow the COCO format:
+The pipeline expects COCO-format annotation files with this structure:
 
 ```json
 {
   "images": [
-    {"id": 1, "file_name": "image001.jpg", "width": 640, "height": 480},
+    {"id": 1, "file_name": "00001.jpg", "width": 512, "height": 512},
     ...
   ],
   "annotations": [
@@ -985,8 +799,8 @@ Each `_annotations.coco.json` file must follow the COCO format:
       "id": 1,
       "image_id": 1,
       "category_id": 1,
-      "bbox": [100, 150, 50, 30],  // [x, y, width, height]
-      "area": 1500,
+      "bbox": [10, 20, 50, 60],  // [x, y, width, height]
+      "area": 3000,
       "iscrowd": 0
     },
     ...
@@ -998,300 +812,81 @@ Each `_annotations.coco.json` file must follow the COCO format:
 }
 ```
 
-### Data Loading Process
-
-1. **COCODataset Initialization**:
-   - Loads annotation JSON file for the split
-   - Builds mappings: `image_id → image_info`, `image_id → annotations[]`
-   - Filters images with no annotations (for training split only)
-
-2. **`__getitem__` (per sample)**:
-   - Loads image from disk (OpenCV)
-   - Extracts bounding boxes and labels from annotations
-   - Converts COCO bbox format `[x, y, w, h]` → `[x1, y1, x2, y2]`
-   - Filters boxes below `min_bbox_size` threshold
-   - Applies augmentations (if enabled and training split)
-   - Resizes image and adjusts bbox coordinates (if `image_size` specified)
-   - Normalizes image (ImageNet stats)
-   - Converts to PyTorch tensors
-
-3. **DataLoader Collation**:
-   - Custom collate function handles variable-length bbox lists
-   - Stacks images into batch tensor `[B, C, H, W]`
-   - Keeps bboxes and labels as lists (one per image)
-
 ### Data Augmentation
 
-Supported augmentations (configured in experiment config):
+The pipeline supports the following augmentations (configurable in dataset config):
 
-- **Horizontal Flip**: `horizontal_flip: 0.5` (50% probability)
-  - Flips image horizontally
-  - Adjusts bbox x-coordinates: `x1_new = width - x2_old`, `x2_new = width - x1_old`
+- **Horizontal Flip**: Randomly flips images horizontally (50% probability)
+- **Brightness Adjustment**: Randomly adjusts brightness by ±10%
 
-- **Vertical Flip**: `vertical_flip: 0.5` (50% probability)
-  - Flips image vertically
-  - Adjusts bbox y-coordinates: `y1_new = height - y2_old`, `y2_new = height - y1_old`
-
-- **Brightness**: `brightness: 0.1` (10% random adjustment)
-  - Multiplies image by random factor `[0.9, 1.1]`
-  - Clips to valid range `[0, 255]`
-
-Augmentations are **only applied during training** (disabled for val/test splits).
+Augmentations are only applied during training, not validation or testing.
 
 ---
 
 ## Dataset Preparation
 
-This section covers preparing the SODA_A dataset for training, including converting from its native format to COCO format and creating patched versions for less powerful systems.
+### SODA-A Dataset Preparation
 
-### SODA_A Dataset Structure
+The pipeline includes scripts to prepare the SODA-A dataset:
 
-The SODA_A dataset comes in a non-standard format:
+#### 1. Convert SODA-A to COCO Format
 
-```
-SODA_A/
-├── Annotations/
-│   ├── train/          # Per-image JSON files (00001.json, 00002.json, ...)
-│   ├── val/
-│   └── test/
-└── Images/             # Image files (may be organized differently)
-```
-
-Each per-image JSON file contains:
-- `images`: Single image dict with `file_name`, `height`, `width`, `id`
-- `annotations`: List of annotations with `poly` (polygon coordinates), `area`, `category_id`
-- `categories`: Category definitions
-
-### Converting to COCO Format
-
-The pipeline expects standard COCO format:
-- Single JSON file per split (not per-image)
-- Bbox format: `[x, y, width, height]` (not polygons)
-- Standard structure: `images`, `annotations`, `categories` as lists
-
-#### Script: `convert_soda_a_to_coco.py`
-
-Converts per-image JSON format to standard COCO format.
-
-**Usage:**
 ```bash
-python scripts/convert_soda_a_to_coco.py \
-    Annotations/train/ \
-    --output-file train/_annotations.coco.json \
+python scripts/dataset/convert_soda_a_to_coco.py \
+    --annotations-dir /path/to/SODA_A/Annotations/train \
+    --images-dir /path/to/SODA_A/Images/train \
+    --output-dir /path/to/output/train \
     --split train
 ```
 
-**What it does:**
-- Reads all JSON files in the specified directory
-- Converts polygon annotations to bounding boxes (COCO format)
-- Merges all per-image annotations into a single COCO JSON file
-- Preserves categories and image metadata
+This converts per-image JSON annotations to a single COCO-format JSON file.
 
-### Creating Patched Datasets
+#### 2. Split Dataset (70/15/15)
 
-For training on less powerful systems, you can create patched versions of the dataset by dividing images into subpatches. This reduces memory requirements and increases the number of training samples.
-
-#### How Patching Works
-
-**The Challenge:**
-When you divide an image into patches, bbox coordinates must be transformed from original image coordinates to patch-relative coordinates.
-
-**The Solution:**
-1. **Coordinate Transformation**: For each patch, subtract the patch's top-left corner from bbox coordinates
-   - Original bbox: `[x, y, w, h]` in image coordinates
-   - Patch offset: `[patch_x, patch_y]`
-   - Transformed bbox: `[x - patch_x, y - patch_y, w, h]` in patch coordinates
-
-2. **Overlap Filtering**: Only keep bboxes that overlap with the patch
-   - Calculate IoU (Intersection over Union) between bbox and patch region
-   - Keep bbox if IoU >= threshold (default: 0.1 = 10% overlap)
-
-3. **Edge Handling**: Handle bboxes that cross patch boundaries
-   - Clip bbox to patch boundaries
-   - Recalculate area in patch coordinates
-
-**Example:**
-```
-Original Image: 2000x2000
-Bbox: [1500, 500, 200, 300]  # x, y, w, h in original image
-
-Patch 1,0 (top-right): [1000, 0, 1000, 1000]
-  - Bbox overlaps with patch? Yes (IoU > 0.1)
-  - Transformed bbox: [500, 500, 200, 300]  # Subtract patch offset
-  - New area: 200 * 300 = 60000 (in patch coordinates)
-```
-
-#### Script: `create_patched_dataset.py`
-
-Creates a patched version of a COCO dataset by dividing images into subpatches.
-
-**Usage:**
 ```bash
-python scripts/create_patched_dataset.py \
-    train/_annotations.coco.json \
-    --output-file train_patches/_annotations.coco.json \
-    --patches-x 2 \
-    --patches-y 2 \
-    --min-overlap 0.1 \
-    --image-dir train \
-    --output-image-dir train_patches
-```
-
-**Parameters:**
-- `--patches-x`: Number of patches horizontally (default: 2)
-- `--patches-y`: Number of patches vertically (default: 2)
-- `--min-overlap`: Minimum IoU ratio to keep a bbox in a patch (default: 0.1)
-  - Higher values = more strict (only bboxes mostly inside patch)
-  - Lower values = more lenient (includes bboxes partially overlapping)
-
-**What it does:**
-- Divides each image into a grid of patches (e.g., 2x2 = 4 patches per image)
-- Transforms bbox coordinates to patch-relative coordinates
-- Filters out bboxes that don't overlap with each patch (based on IoU threshold)
-- Creates new patch images and saves them
-- Generates a new COCO annotation file for the patches
-
-#### Master Script: `prepare_soda_a_dataset.py`
-
-Orchestrates the entire preparation process.
-
-**Usage:**
-```bash
-# Basic conversion (no patches)
-python scripts/prepare_soda_a_dataset.py \
-    --soda-a-dir /path/to/SODA_dataset/SODA_A \
+python scripts/dataset/split_coco_three_way.py \
+    --annotation-file /path/to/all_annotations.coco.json \
     --output-dir /path/to/output \
-    --copy-images
-
-# With patching
-python scripts/prepare_soda_a_dataset.py \
-    --soda-a-dir /path/to/SODA_dataset/SODA_A \
-    --output-dir /path/to/output \
-    --create-patches \
-    --patches-x 2 \
-    --patches-y 2 \
-    --min-overlap 0.1 \
+    --train-ratio 0.7 \
+    --test-ratio 0.15 \
+    --val-ratio 0.15 \
+    --seed 42 \
     --copy-images
 ```
 
-**What it does:**
-1. Converts all splits (train/val/test) from per-image JSON to COCO format
-2. Optionally copies images to output directory
-3. Optionally creates patched versions of each split
-
-### Complete Workflow
-
-#### Step 1: Convert SODA_A to COCO Format
+#### 3. Create Patched Dataset
 
 ```bash
-cd /home/vlv/Documents/master/computervision/CV_ppln
-
-python scripts/prepare_soda_a_dataset.py \
-    --soda-a-dir /home/vlv/Documents/master/computervision/SODA_dataset/SODA_A \
-    --output-dir /home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_coco \
-    --copy-images
+python scripts/dataset/create_patched_dataset.py \
+    --annotation-file /path/to/train/_annotations.coco.json \
+    --images-dir /path/to/train \
+    --output-dir /path/to/output/train_patches \
+    --max-patch-size 512 \
+    --min-overlap 0.1
 ```
 
-This creates:
-```
-SODA_A_coco/
-├── train/
-│   ├── _annotations.coco.json
-│   └── (image files)
-├── val/
-│   ├── _annotations.coco.json
-│   └── (image files)
-└── test/
-    ├── _annotations.coco.json
-    └── (image files)
-```
+#### 4. Automated Dataset Preparation
 
-#### Step 2: Create Patched Version (Optional)
+Use the comprehensive shell script:
 
 ```bash
-python scripts/prepare_soda_a_dataset.py \
-    --soda-a-dir /home/vlv/Documents/master/computervision/SODA_dataset/SODA_A \
-    --output-dir /home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_coco \
-    --create-patches \
-    --patches-x 2 \
-    --patches-y 2 \
-    --min-overlap 0.1 \
-    --copy-images
+cd scripts/dataset
+./prepare_dataset.sh
 ```
 
-This creates additional directories:
-```
-SODA_A_coco/
-├── train/
-├── train_patches/        # 2x2 patches of train images
-│   ├── _annotations.coco.json
-│   └── (patch image files)
-├── val/
-├── val_patches/          # 2x2 patches of val images
-└── test/
-```
-
-#### Step 3: Update Dataset Config
-
-Update your dataset config file (e.g., `configs/datasets/soda_a_05_small.yaml`) to point to the new location:
-
-```yaml
-paths:
-  root: /home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_coco
-
-annotation_file: _annotations.coco.json
-```
-
-For patched version:
-```yaml
-paths:
-  root: /home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_coco
-
-annotation_file: _annotations.coco.json
-# Use train_patches, val_patches, test_patches splits
-```
-
-### Benefits and Limitations of Patching
-
-**Benefits:**
-1. **Reduced Memory**: Smaller images = less GPU memory needed
-2. **Faster Training**: Smaller images = faster forward/backward passes
-3. **More Training Samples**: 1 image → N patches (e.g., 2x2 = 4x more samples)
-4. **Better for Small Objects**: Patches focus on smaller regions
-
-**Limitations:**
-1. **Context Loss**: Patches lose global context of full image
-2. **Split Objects**: Objects crossing patch boundaries are split
-3. **Storage**: Patched dataset uses more disk space (N patches per image)
+Edit the hardcoded variables at the top of the script:
+- `SODA_A_DIR`: Path to SODA-A dataset
+- `OUTPUT_DIR`: Output directory for prepared dataset
+- `MAX_PATCH_SIZE`: Maximum patch size (e.g., 512)
+- `TRAIN_RATIO`, `TEST_RATIO`, `VAL_RATIO`: Split ratios
+- `RANDOM_SEED`: Random seed for reproducibility
 
 ### Reproducibility
 
-The dataset preparation scripts are designed to be fully reproducible. The following measures ensure deterministic output:
-
-1. **File Ordering**: Input JSON files are sorted by filename before processing
-2. **Image Ordering**: Images are sorted by ID in the output COCO files
-3. **Annotation Ordering**: Annotations are sorted by ID within each image and globally
-4. **Category Ordering**: Categories are sorted by ID
-5. **Patch ID Generation**: Patch IDs are generated deterministically based on sorted image IDs
-
-**Important**: Running the scripts multiple times with the same input will produce identical output files (byte-for-byte), ensuring reproducible experiments.
-
-### Troubleshooting Dataset Preparation
-
-**Images not found:**
-- Check that images are in `Images/` or `Images/train/`, `Images/val/`, `Images/test/`
-- Use `--copy-images` to copy images to the output directory
-- Manually specify image directory with `--image-dir`
-
-**No annotations in patches:**
-- Lower `--min-overlap` value (e.g., 0.05)
-- Check that bboxes actually overlap with patches
-- Verify original annotations are correct
-
-**Out of memory:**
-- Process one split at a time
-- Reduce patch grid size (e.g., 1x2 instead of 2x2)
-- Process images in smaller batches
+All dataset preparation scripts ensure deterministic output:
+- Files are processed in sorted order
+- Random operations use fixed seeds
+- Outputs are sorted before saving
 
 ---
 
@@ -1299,58 +894,89 @@ The dataset preparation scripts are designed to be fully reproducible. The follo
 
 ### CFINet Overview
 
-CFINet (Coarse-to-fine Proposal Generation and Imitation Learning Network) is a two-stage object detector built on Faster R-CNN. It uses:
+CFINet (Coarse-to-fine Proposal Generation and Imitation Learning Network) is a two-stage object detector designed for small object detection. It is implemented entirely in **pure PyTorch** within this codebase.
 
-- **Backbone**: ResNet-50 with FPN (Feature Pyramid Network)
-- **RPN Head**: CRPNHead (Coarse-to-fine RPN Head)
-- **ROI Head**: FIRoIHead (Feature Imitation ROI Head)
+**Architecture Components:**
 
-### CFINet Wrapper Implementation
+1. **Backbone**: ResNet-50 (pretrained on ImageNet)
+   - Extracts multi-scale features: C2, C3, C4, C5
 
-The `CFINetWrapper` (`src/models/architectures/cfinet.py`) provides a bridge between MMDetection and this pipeline:
+2. **Neck**: FPN (Feature Pyramid Network)
+   - Creates feature pyramid: P2, P3, P4, P5, P6
+   - Enables multi-scale detection
 
-1. **Initialization**:
-   - If `config_file` is provided: loads MMDetection config from file (relative to `src/models/architectures/` or absolute path)
-   - If `config_file` is `null`: uses CFINet model config from `CFINetWrapper._get_model_config()`
-   - Updates `num_classes` in config to match dataset
-   - Creates `con_queue_dir` for FIRoIHead (if needed)
-   - Builds model using `mmdet.models.build_detector()`
-   - Loads pretrained checkpoint (if provided)
+3. **RPN Head**: CRPNHead (Coarse-to-fine RPN Head)
+   - **Coarse Stage**: Initial regression to refine anchor positions
+   - **Fine Stage**: Classification and refined regression
+   - Uses Adaptive Convolution for feature alignment
 
-2. **Forward Pass** (training mode):
-   - Receives images `[B, C, H, W]` and targets dict
-   - Prepares `img_metas` (image metadata for MMDetection)
-   - Calls `model.forward_train()` with MMDetection format
-   - Returns loss dictionary from MMDetection
+4. **Anchor Assignment**: DynamicAssigner
+   - Dynamic IoU threshold based on object size
+   - Ensures sufficient positive samples for small objects
+   - Formula: `Ta = max(0.25, 0.20 + γ · log(√(w·h)/12))`
 
-3. **Forward Pass** (inference mode):
-   - Calls `model.simple_test()` with images and metadata
-   - Returns detection results in MMDetection format
+5. **ROI Head**: RoIHead with Feature Imitation
+   - Classification and regression heads
+   - Feature Imitation branch for contrastive learning
+   - Feat2Embed module for feature embedding
 
-4. **Predict Method**:
-   - Formats MMDetection results into pipeline format:
-     ```python
-     {
-       'bboxes': np.ndarray,  # [N, 4] in [x1, y1, x2, y2] format
-       'labels': np.ndarray,  # [N] class IDs
-       'scores': np.ndarray   # [N] confidence scores
-     }
-     ```
-   - Filters detections by score threshold
+### Model Implementation
+
+The CFINet model is located in `src/models/architectures/cfinet_pytorch.py`:
+
+```python
+class CFINet(nn.Module):
+    """
+    Complete CFINet model for object detection.
+    
+    Pure PyTorch implementation - no external dependencies.
+    """
+    
+    def __init__(self, num_classes=9, pretrained=True, **kwargs):
+        # ResNet-50 backbone
+        # FPN neck
+        # CRPNHead for proposal generation
+        # DynamicAssigner for anchor assignment
+        # RoIHead for detection
+    
+    def forward(self, images, targets=None):
+        # Training: returns loss dictionary
+        # Inference: returns detection results
+    
+    def predict(self, images, score_threshold=0.5):
+        # Inference with score filtering
+```
+
+### Loss Functions
+
+The model computes the following losses during training:
+
+1. **RPN Losses**:
+   - `loss_rpn_coarse`: Coarse regression loss (Smooth L1)
+   - `loss_rpn_fine_cls`: Fine classification loss (Binary Cross-Entropy)
+   - `loss_rpn_fine_reg`: Fine regression loss (Smooth L1)
+
+2. **ROI Losses**:
+   - `loss_cls`: Classification loss (Cross-Entropy)
+   - `loss_bbox`: Regression loss (Smooth L1)
+   - `contrastive_loss`: Feature imitation loss
 
 ### Model Registry
 
 Models are registered using the `@register_model` decorator:
 
 ```python
-@register_model('CFINet')
-class CFINetWrapper(nn.Module):
-    ...
-```
+from src.models import create_model
 
-The registry allows dynamic model creation from config:
-```python
-model = get_model('CFINet', model_config)
+config = {
+    'model': {
+        'type': 'CFINet',
+        'num_classes': 9,
+        'pretrained': True
+    }
+}
+
+model = create_model(config)
 ```
 
 ---
@@ -1362,12 +988,12 @@ model = get_model('CFINet', model_config)
 **`scripts/train.py`** is the main training script:
 
 ```bash
-python scripts/train.py --config configs/experiments/exp_cfinet_soda.yaml
+python scripts/train.py --config configs/experiments/exp_cfinet_soda_512_patches.yaml
 ```
 
 Or using the shell wrapper:
 ```bash
-./train.sh exp_cfinet_soda
+./train.sh exp_cfinet_soda_512_patches
 ```
 
 ### Training Flow
@@ -1377,84 +1003,46 @@ Or using the shell wrapper:
    - Sets random seed for reproducibility
    - Creates output directory and saves config copy
    - Creates train/val/test DataLoaders
-   - Creates model (CFINetWrapper)
-   - Moves model to device (GPU/CPU)
-   - Initializes TensorBoard logger (if enabled)
+   - Creates model (CFINet)
+   - Initializes optimizer and scheduler
+   - Sets up TensorBoard logging
 
-2. **Trainer Creation**:
-   - Creates `DetectionTrainer` instance
-   - Initializes optimizer (SGD/Adam) from config
-   - Initializes scheduler (Step/Cosine) from config
-   - Sets up metrics (mAP calculation)
-
-3. **Training Loop** (per epoch):
-   - **Train Phase**:
-     - Sets model to `train()` mode
-     - Iterates over training DataLoader
-     - For each batch:
-       - Moves images and targets to device
-       - Calls `model(images, targets=targets)` → returns loss dict
-       - Aggregates losses (handles None values, lists, tensors)
-       - Backward pass and optimizer step
-       - Gradient clipping (if configured)
-       - Accumulates loss components for logging
+2. **Training Loop** (per epoch):
+   - **Training Phase**:
+     - Iterates over training batches
+     - Forward pass: `model(images, targets=targets)`
+     - Computes losses
+     - Backward pass and optimizer step
+     - Logs training losses
+   
    - **Validation Phase**:
-     - Sets model to `eval()` mode
-     - Iterates over validation DataLoader
-     - Computes losses (no gradient computation)
-     - Accumulates metrics
+     - Iterates over validation batches
+     - Forward pass (no gradients)
+     - Computes validation losses
+     - Collects predictions for metrics
+     - Computes mAP
+   
    - **Post-Epoch**:
      - Logs metrics to TensorBoard
-     - Saves metrics history to YAML
-     - Checkpointing (saves best/last if improved)
-     - Early stopping check
+     - Saves metrics history
+     - Saves checkpoint if improved
+     - Checks early stopping
      - Steps learning rate scheduler
 
-4. **Checkpointing**:
-   - **Best checkpoint**: Saved when monitored metric improves
-     - For `mode: "min"` (loss): saves when metric decreases
-     - For `mode: "max"` (mAP): saves when metric increases
-   - **Last checkpoint**: Saved every epoch (if enabled)
-   - Checkpoint contains:
-     ```python
-     {
-       'epoch': int,
-       'model_state_dict': dict,
-       'optimizer_state_dict': dict,
-       'best_metric': float
-     }
-     ```
+3. **Completion**:
+   - Saves final checkpoint
+   - Saves metrics history
+   - Closes TensorBoard logger
 
-5. **Early Stopping**:
-   - Monitors validation metric (e.g., `val_loss`)
-   - If no improvement for `patience` epochs, stops training
-   - Respects `mode` ("min" for loss, "max" for mAP)
+### Monitoring Training
 
-### Loss Handling
-
-MMDetection models return a loss dictionary:
-```python
-{
-  'loss_rpn_cls': tensor,
-  'loss_rpn_bbox': tensor,
-  'loss_cls': tensor,
-  'loss_bbox': tensor,
-  ...
-}
+**TensorBoard**:
+```bash
+tensorboard --logdir outputs/experiments/exp_cfinet_soda_512_patches/tensorboard
 ```
 
-The trainer:
-1. Extracts all loss values (handles None, lists, tensors)
-2. Sums them into total loss
-3. Performs backward pass
-4. Logs individual loss components separately
-
-### Metrics Calculation
-
-During validation, the trainer can compute mAP if configured:
-- Collects predictions and ground truth across validation set
-- Calls `mean_average_precision()` from `detection_metrics.py`
-- Logs to TensorBoard and metrics history
+**Metrics History**:
+Check `outputs/experiments/exp_cfinet_soda_512_patches/metrics_history.yaml` for per-epoch metrics.
 
 ---
 
@@ -1462,200 +1050,59 @@ During validation, the trainer can compute mAP if configured:
 
 ### Testing Script
 
-**`scripts/test.py`** runs inference on the test set:
+**`scripts/test.py`** evaluates a trained model:
 
 ```bash
-python scripts/test.py --config configs/experiments/exp_cfinet_soda.yaml --checkpoint outputs/experiments/exp_cfinet_soda/checkpoints/best.pth
+python scripts/test.py \
+    --config configs/experiments/exp_cfinet_soda_512_patches.yaml \
+    --checkpoint outputs/experiments/exp_cfinet_soda_512_patches/checkpoints/best.pth
 ```
 
-Or using the shell wrapper:
-```bash
-./test.sh exp_cfinet_soda best
-```
+### Evaluation Metrics
 
-### Testing Flow
+The pipeline computes:
 
-1. **Setup**:
-   - Loads config and checkpoint
-   - Creates model and loads checkpoint weights
-   - Sets model to `eval()` mode
-   - Creates test DataLoader
+- **mAP (mean Average Precision)**: Average precision across all classes
+- **Per-class AP**: Average precision for each class
+- **IoU Threshold**: Default 0.5 (configurable)
 
-2. **Inference Loop**:
-   - Iterates over test DataLoader
-   - For each batch:
-     - Calls `model.predict(images, score_threshold=...)`
-     - Collects predictions (bboxes, labels, scores)
-     - Collects ground truth (bboxes, labels)
-     - Stores per-image results
-
-3. **Metrics Calculation**:
-   - Computes mAP across all test images
-   - Uses IoU threshold of 0.5 (default)
-
-4. **Output**:
-   - Saves `predictions.json` with:
-     ```json
-     {
-       "experiment": "exp_cfinet_soda",
-       "checkpoint": "path/to/best.pth",
-       "score_threshold": 0.05,
-       "metrics": {
-         "mAP": 0.7234
-       },
-       "per_image": [
-         {
-           "image_id": 1,
-           "image_name": "image001.jpg",
-           "pred_bboxes_xyxy": [[x1, y1, x2, y2], ...],
-           "pred_scores": [0.95, 0.87, ...],
-           "pred_labels": [1, 2, ...],
-           "gt_bboxes_xyxy": [[x1, y1, x2, y2], ...],
-           "gt_labels": [1, 2, ...]
-         },
-         ...
-       ]
-     }
-     ```
-
-### Metrics: Mean Average Precision (mAP)
-
-The mAP calculation (`src/training/detection_metrics.py`) uses:
-
-1. **IoU Calculation**: Intersection over Union between predicted and ground truth boxes
-2. **Matching**: Greedy matching of predictions to ground truth (highest IoU first)
-3. **Precision-Recall Curve**: Computes precision and recall at each prediction threshold
-4. **11-Point Interpolation**: Averages precision at 11 recall levels (0.0, 0.1, ..., 1.0)
-5. **Per-Class AP**: Computes AP for each class separately
-6. **mAP**: Averages AP across all classes
+Results are saved to:
+- `outputs/experiments/{exp_name}/predictions.json`
+- Console output with detailed metrics
 
 ---
 
 ## Utilities and Scripts
 
-### Dataset Utilities
+### Dataset Preparation Scripts
 
-#### 1. Split COCO Dataset
+All dataset preparation scripts are in `scripts/dataset/`:
 
-**`scripts/split_coco_dataset.py`**: Splits a COCO dataset into train/val splits.
+- **`convert_soda_a_to_coco.py`**: Convert SODA-A format to COCO format
+- **`split_coco_three_way.py`**: Split COCO dataset into train/test/val
+- **`create_patched_dataset.py`**: Create patched dataset from large images
+- **`prepare_dataset.sh`**: Comprehensive automated dataset preparation
+- **`visualize_patched_dataset.py`**: Visualize patched images and annotations
+- **`test_reproducibility.py`**: Test dataset preparation reproducibility
 
-```bash
-python scripts/split_coco_dataset.py \
-  /path/to/train/_annotations.coco.json \
-  --output-dir /path/to/SODA_ROOT \
-  --val-ratio 0.2 \
-  --seed 42
+### Visualization Script
+
+**`scripts/dataset/visualize_patched_dataset.py`**: Visualize patched images with annotations.
+
+Edit hardcoded variables at the top:
+```python
+BASE_DIR = "/path/to/dataset"
+SPLIT = "train_patches"
+NUM_SAMPLES = 10
 ```
 
-**What it does**:
-- Loads COCO annotation file
-- Randomly shuffles image IDs
-- Splits into train/val based on `val_ratio`
-- Creates new annotation files in `train/` and `val/` directories
-- Optionally copies images to split directories
-
-**Use case**: When you only have a train/test split and need a validation set.
-
-#### 2. Convert SODA_A to COCO Format
-
-**`scripts/convert_soda_a_to_coco.py`**: Converts SODA_A per-image JSON format to standard COCO format.
-
+Or use command-line arguments:
 ```bash
-python scripts/convert_soda_a_to_coco.py \
-    Annotations/train/ \
-    --output-file train/_annotations.coco.json \
-    --split train
-```
-
-**What it does**:
-- Reads all per-image JSON files in the specified directory
-- Converts polygon annotations to bounding boxes (COCO format)
-- Merges all per-image annotations into a single COCO JSON file
-- Preserves categories and image metadata
-
-**Use case**: Converting SODA_A dataset from its native format to COCO format.
-
-#### 3. Create Patched Dataset
-
-**`scripts/create_patched_dataset.py`**: Creates a patched version of a COCO dataset by dividing images into subpatches.
-
-```bash
-python scripts/create_patched_dataset.py \
-    train/_annotations.coco.json \
-    --output-file train_patches/_annotations.coco.json \
-    --patches-x 2 \
-    --patches-y 2 \
-    --min-overlap 0.1 \
-    --image-dir train \
-    --output-image-dir train_patches
-```
-
-**What it does**:
-- Divides each image into a grid of patches (e.g., 2x2 = 4 patches per image)
-- Transforms bbox coordinates to patch-relative coordinates
-- Filters out bboxes that don't overlap with each patch (based on IoU threshold)
-- Creates new patch images and saves them
-- Generates a new COCO annotation file for the patches
-
-**Use case**: When images are too large for GPU memory, split into smaller patches for training on less powerful systems.
-
-#### 4. Visualize Patched Dataset
-
-**`scripts/visualize_patched_dataset.py`**: Visualizes and verifies the correctness of patched datasets.
-
-```bash
-# Basic visualization
-python scripts/visualize_patched_dataset.py \
-    SODA_dataset/SODA_A_coco/train_patches/_annotations.coco.json \
-    --image-dir SODA_dataset/SODA_A_coco/train_patches \
-    --num-samples 5
-
-# With original image comparison
-python scripts/visualize_patched_dataset.py \
-    SODA_dataset/SODA_A_coco/train_patches/_annotations.coco.json \
-    --image-dir SODA_dataset/SODA_A_coco/train_patches \
-    --original-annotation SODA_dataset/SODA_A_coco/train/_annotations.coco.json \
-    --show-original \
-    --num-samples 5
-
-# Save visualizations (non-interactive)
-python scripts/visualize_patched_dataset.py \
-    SODA_dataset/SODA_A_coco/train_patches/_annotations.coco.json \
-    --image-dir SODA_dataset/SODA_A_coco/train_patches \
-    --save-dir visualizations/train_patches \
+python scripts/dataset/visualize_patched_dataset.py \
+    --base-dir /path/to/dataset \
+    --split train_patches \
     --num-samples 10
 ```
-
-**What it does**:
-- Displays patch images with bounding boxes overlaid
-- Verifies that bbox coordinates are correctly transformed from original to patch coordinates
-- Optionally shows original image alongside patch with patch region highlighted
-- Prints dataset statistics (annotations per patch, category distribution, etc.)
-- Can work interactively or save visualizations to files
-
-**Features**:
-- Color-coded bounding boxes by category
-- Red dashed lines showing patch boundaries
-- Transformation verification with error reporting
-- Statistics including expansion factor and category distribution
-
-**Use case**: Verifying that patched datasets are correctly created and bbox transformations are accurate.
-
-### Training Utilities
-
-#### Queue Multiple Experiments
-
-**`queue.sh`**: Runs multiple experiments sequentially.
-
-```bash
-./queue.sh exp_cfinet_soda exp_cfinet_soda_patches
-```
-
-**What it does**:
-- Runs each experiment in sequence
-- Logs output to `outputs/queue_logs/`
-- Continues even if one experiment fails
-- Provides summary at the end
 
 ---
 
@@ -1665,19 +1112,20 @@ python scripts/visualize_patched_dataset.py \
 CV_ppln/
 ├── configs/
 │   ├── datasets/
-│   │   ├── soda_a_05_small.yaml
-│   │   └── soda_a_05_small_patches.yaml
+│   │   ├── soda_a_coco_512_patches.yaml
+│   │   └── ...
 │   └── experiments/
-│       ├── exp_cfinet_soda.yaml
-│       └── exp_cfinet_soda_patches.yaml
+│       ├── exp_cfinet_soda_512_patches.yaml
+│       └── ...
 ├── scripts/
 │   ├── train.py                    # Main training script
 │   ├── test.py                     # Testing/evaluation script
-│   ├── split_coco_dataset.py       # Dataset splitting utility
-│   ├── convert_soda_a_to_coco.py   # Convert SODA_A to COCO format
-│   ├── create_patched_dataset.py   # Create patched dataset
-│   ├── prepare_soda_a_dataset.py   # Master script for dataset preparation
-│   └── visualize_patched_dataset.py # Visualize and verify patched datasets
+│   └── dataset/
+│       ├── convert_soda_a_to_coco.py
+│       ├── create_patched_dataset.py
+│       ├── split_coco_three_way.py
+│       ├── prepare_dataset.sh
+│       └── ...
 ├── src/
 │   ├── data/
 │   │   ├── __init__.py       # DataLoader factory
@@ -1686,32 +1134,27 @@ CV_ppln/
 │   │   ├── __init__.py       # Model factory
 │   │   ├── registry.py       # Model registration system
 │   │   └── architectures/
-│   │       └── cfinet.py     # CFINet wrapper (contains embedded default config)
+│   │       └── cfinet_pytorch.py  # Pure PyTorch CFINet implementation
 │   ├── training/
 │   │   ├── detection_trainer.py  # Training loop
 │   │   └── detection_metrics.py  # mAP calculation
 │   └── utils/
 │       ├── config.py         # Config loading
-│       ├── helpers.py         # Utility functions
-│       ├── tensorboard_logger.py  # TensorBoard integration
-│       └── memory_profiler.py     # Memory profiling
+│       ├── tensorboard_logger.py
+│       └── ...
 ├── outputs/
-│   ├── experiments/           # Training outputs
-│   │   └── <exp_name>/
-│   │       ├── config.yaml
-│   │       ├── checkpoints/
-│   │       │   ├── best.pth
-│   │       │   └── last.pth
-│   │       ├── metrics_history.yaml
-│   │       └── tensorboard/
-│   └── tests/                 # Test outputs
-│       └── <exp_name>/
-│           └── predictions.json
-├── train.sh                   # Training script wrapper
-├── test.sh                    # Testing script wrapper
-├── queue.sh                   # Queue experiments script
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+│   └── experiments/
+│       └── {experiment_name}/
+│           ├── checkpoints/
+│           │   ├── best.pth
+│           │   └── last.pth
+│           ├── metrics_history.yaml
+│           ├── predictions.json
+│           └── tensorboard/
+├── requirements.txt
+├── train.sh
+├── test.sh
+└── README.md
 ```
 
 ---
@@ -1720,164 +1163,113 @@ CV_ppln/
 
 ### Common Issues
 
-#### 1. **Config Path Resolution Error**
+**CUDA Out of Memory**:
+- Reduce batch size in experiment config
+- Use smaller image size
+- Use patched dataset with smaller patches
+- Use `max_samples` to limit dataset size
 
-**Error**: `FileNotFoundError: [Errno 2] No such file or directory: 'configs/experiments/configs/datasets/...'`
+**No detections during inference**:
+- Lower `score_threshold` in evaluation config
+- Check that model was trained properly
+- Verify dataset has annotations
 
-**Solution**: The config loader now automatically finds the project root. Ensure your dataset config path in the experiment config is relative to the project root:
-```yaml
-dataset: "configs/datasets/soda_a_05_small.yaml"  # ✓ Correct
-dataset: "datasets/soda_a_05_small.yaml"         # ✗ Wrong
-```
+**Training loss not decreasing**:
+- Check learning rate (may be too high/low)
+- Verify data augmentation is working
+- Check that losses have gradients (should not be zero)
 
-#### 2. **MMDetection Import Error**
+**Images not found**:
+- Check that images are in correct directory structure
+- Verify paths in dataset config
+- Use `--copy-images` flag during dataset preparation
 
-**Error**: `ImportError: Could not import MMDetection`
+**No annotations in patches**:
+- Lower `--min-overlap` value (e.g., 0.05)
+- Check that bboxes actually overlap with patches
+- Verify original annotations are correct
 
-**Solution**: Install MMDetection and its dependencies:
-```bash
-pip install mmdet>=2.26.0 mmcv-full>=1.5.0
-```
-
-Or reinstall from requirements.txt:
-```bash
-pip install -r requirements.txt
-```
-
-Verify installation:
-```bash
-python -c "import mmdet; print(mmdet.__version__)"
-```
-
-#### 3. **CUDA Out of Memory**
-
-**Error**: `RuntimeError: CUDA out of memory`
-
-**Solutions**:
-- Reduce `batch_size` in experiment config
-- Reduce `image_size` in dataset config (or use patches)
-- Enable gradient accumulation (not currently supported, but can be added)
-
-#### 4. **Checkpoint Not Found**
-
-**Error**: `FileNotFoundError: Checkpoint not found`
-
-**Solution**: Ensure training has completed and checkpoint exists:
-```bash
-ls outputs/experiments/<exp_name>/checkpoints/
-```
-
-If missing, check training logs for errors.
-
-#### 5. **Dataset Path Issues**
-
-**Error**: `Could not load image: /path/to/image.jpg`
-
-**Solution**: 
-- Verify dataset paths in `configs/datasets/soda_a_05_small.yaml`
-- Ensure annotation file `_annotations.coco.json` exists in each split directory
-- Check that image filenames in annotations match actual files
-
-#### 6. **Model Config File Not Found**
-
-**Error**: `FileNotFoundError: [Errno 2] No such file or directory: '.../config_file.py'`
-
-**Solution**: 
-- **Recommended**: Set `model.config_file: null` to use the CFINet model definition (no file needed)
-- **If using custom config**: Ensure the `model.config_file` path is correct. It can be:
-  - Relative to `src/models/architectures/` (e.g., `"my_custom_config.py"`)
-  - Absolute path (e.g., `"/path/to/config.py"`)
-
-```yaml
-model:
-  config_file: null  # Use CFINet model definition (recommended)
-  # OR
-  # config_file: "my_custom_config.py"  # Custom config file
-```
-
-The CFINet model definition is embedded in `src/models/architectures/cfinet.py`, so no external config file is needed unless you want to customize it.
-
-#### 7. **Early Stopping Not Working**
-
-**Issue**: Training doesn't stop even when validation metric stops improving.
-
-**Solution**: Check `training.early_stopping.mode` matches the metric:
-- For `monitor: "val_loss"` → `mode: "min"`
-- For `monitor: "val_mAP"` → `mode: "max"`
-
-#### 8. **mAP Calculation Errors**
-
-**Error**: `ValueError: ...` during mAP calculation
-
-**Solution**: 
-- Ensure predictions and ground truth are in correct format
-- Check that bboxes are in `[x1, y1, x2, y2]` format (not `[x, y, w, h]`)
-- Verify labels are integer class IDs (not one-hot)
-
-### Debugging Tips
-
-1. **Enable Memory Profiling**:
-   ```yaml
-   debug:
-     profile_memory: true
-     detailed_memory: true
-   ```
-
-2. **Check TensorBoard Logs**:
-   ```bash
-   tensorboard --logdir outputs/experiments/<exp_name>/tensorboard
-   ```
-
-3. **Inspect Config After Loading**:
-   Add print statement in `scripts/train.py`:
-   ```python
-   config = load_config(config_path)
-   import json
-   print(json.dumps(config, indent=2, default=str))
-   ```
-
-4. **Test Data Loading**:
-   ```python
-   from src.data import create_dataloaders
-   from src.utils.config import load_config
-   config = load_config('configs/experiments/exp_cfinet_soda.yaml')
-   train_loader, val_loader, test_loader = create_dataloaders(config)
-   batch = next(iter(train_loader))
-   print(batch.keys())  # Should show: image, bboxes, labels, ...
-   ```
+**Out of memory**:
+- Process one split at a time
+- Reduce patch grid size (e.g., 1x2 instead of 2x2)
+- Process images in smaller batches
 
 ---
 
-## Quick Reference
+## Key Design Decisions
 
-### Training Command
-```bash
-./train.sh exp_cfinet_soda
-```
+### Pure PyTorch Implementation
 
-### Testing Command
-```bash
-./test.sh exp_cfinet_soda best
-```
+The system uses a **pure PyTorch implementation** of CFINet rather than wrapping MMDetection:
 
-### Key Config Files
-- Dataset: `configs/datasets/soda_a_05_small.yaml`
-- Model: CFINet model definition in `src/models/architectures/cfinet.py` (no separate config file needed)
-- Experiment: `configs/experiments/exp_cfinet_soda.yaml`
+- **Benefits**:
+  - No external dependencies (MMDetection, mmcv)
+  - Full control over model architecture
+  - Easier debugging and modification
+  - Simpler installation and deployment
+  - Better integration with PyTorch ecosystem
 
-### Output Locations
-- Training: `outputs/experiments/<exp_name>/`
-- Testing: `outputs/tests/<exp_name>/predictions.json`
+- **Trade-offs**:
+  - Some advanced features may need manual implementation
+  - Loss functions are simplified but functional
 
-### TensorBoard
-```bash
-tensorboard --logdir outputs/experiments/<exp_name>/tensorboard
-```
+### COCO Format Compatibility
+
+The system uses COCO format for maximum compatibility:
+
+- Standard format used by many datasets
+- Easy to convert from other formats
+- Well-documented and widely supported
+
+### Horizontal Bounding Boxes (HBB)
+
+While SODA-A paper specifies OBB (Oriented Bounding Boxes), this pipeline uses HBB:
+
+- Simpler implementation
+- Compatible with standard COCO format
+- Sufficient for many use cases
+- Can be extended to OBB if needed
 
 ---
 
-## Summary
+## Future Improvements
 
-This pipeline provides a complete, streamlined workflow for training and evaluating CFINet on COCO-format object detection datasets. The modular design allows easy extension to other models or datasets, while the comprehensive configuration system provides fine-grained control over all aspects of training and evaluation.
+Potential enhancements to the system:
 
-For questions or issues, refer to the troubleshooting section or inspect the source code in `src/` for detailed implementation.
+1. **Complete Loss Implementation**:
+   - IoU loss for regression
+   - Complete feature imitation contrastive loss
+   - Multi-level ROI align
+
+2. **Advanced Features**:
+   - Mixed precision training
+   - Distributed training support
+   - More augmentation options
+
+3. **Model Variants**:
+   - Different backbone architectures
+   - Different RPN configurations
+   - Ablation studies
+
+---
+
+## License
+
+[Add your license information here]
+
+---
+
+## Citation
+
+If you use this codebase, please cite:
+
+- CFINet paper: [Add citation]
+- SODA dataset: [Add citation]
+
+---
+
+## Acknowledgments
+
+- CFINet authors for the original architecture
+- SODA dataset creators
+- PyTorch and torchvision teams

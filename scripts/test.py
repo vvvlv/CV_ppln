@@ -53,7 +53,7 @@ def test(
     # Model
     model = create_model(config).to(device)
     model.eval()
-
+    
     # Checkpoint
     if checkpoint_path is None:
         checkpoint_path = str(Path(config["output"]["dir"]) / "checkpoints" / "best.pth")
@@ -68,7 +68,7 @@ def test(
     # Data
     _, _, test_loader = create_dataloaders(config)
     print(f"Test samples: {len(test_loader.dataset)}")
-
+    
     # Output dir
     if output_dir is None:
         out_dir = Path("outputs/tests") / exp_name
@@ -79,7 +79,7 @@ def test(
     # Evaluation settings
     score_thr = float(config.get("evaluation", {}).get("score_threshold", 0.05))
     metrics = create_metrics(config.get("training", {}).get("metrics", ["mAP"]))
-
+    
     # Accumulators
     pred_bboxes_all: List[np.ndarray] = []
     pred_labels_all: List[np.ndarray] = []
@@ -87,7 +87,7 @@ def test(
     gt_bboxes_all: List[np.ndarray] = []
     gt_labels_all: List[np.ndarray] = []
     per_image: List[Dict[str, Any]] = []
-
+    
     print("\nRunning inference...")
     with torch.no_grad():
         for batch in tqdm(test_loader, desc="Testing"):
@@ -156,7 +156,7 @@ def test(
         print(f"  {k}: {v:.4f}")
     print("=" * 70)
     print(f"\n✓ Saved: {out_dir / 'predictions.json'}")
-
+    
     return results
 
 
@@ -166,6 +166,6 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default=None, help="Path to checkpoint (default: <exp_output>/checkpoints/best.pth)")
     parser.add_argument("--output-dir", default=None, help="Output directory (default: outputs/tests/<exp_name>)")
     args = parser.parse_args()
-
-    test(args.config, args.checkpoint, args.output_dir)
+    
+    test(args.config, args.checkpoint, args.output_dir) 
 

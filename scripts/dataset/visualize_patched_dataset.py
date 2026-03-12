@@ -27,8 +27,8 @@ import random
 # Base directory for SODA_A dataset (relative to this script or absolute path)
 # Default: assumes script is in CV_ppln/scripts/ and dataset is in ../SODA_dataset/SODA_A_coco
 _script_dir = Path(__file__).parent.resolve()
-_project_root = _script_dir.parent.parent  # Go up from scripts/ to project root
-BASE_DIR = _project_root / "SODA_dataset" / "SODA_A_coco"
+_project_root = _script_dir.parent.parent.parent  # Go up from scripts/ to project root
+BASE_DIR = _project_root / "SODA_dataset" / "SODA_A_coco_512"
 # Or set an absolute path directly:
 # BASE_DIR = Path("/home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_coco")
 
@@ -46,7 +46,7 @@ IMAGE_DIR = None        # Auto: BASE_DIR / SPLIT
 ORIGINAL_ANNOTATION_FILE = None  # Auto: BASE_DIR / SPLIT.replace("_patches", "") / "_annotations.coco.json"
 
 # Visualization settings
-NUM_SAMPLES = 1          # Number of random patches to visualize
+NUM_SAMPLES = 5          # Number of random patches to visualize
 RANDOM_SEED = 42         # Random seed for reproducibility
 SHOW_ORIGINAL = False    # Show original image alongside patch
 VERIFY_TRANSFORMATIONS = True  # Verify bbox transformations

@@ -51,8 +51,5 @@ typing_extensions
 Werkzeug
 einops
 timm
-# MMDetection dependencies (for CFINet object detection)
-# Note: CFINet should be installed separately from the CFI/CFINet directory
-# Run: cd CFI/CFINet && pip install -v -e .
-mmcv-full>=1.5.0
-mmdet>=2.26.0
+# Note: CFINet is implemented in pure PyTorch within this codebase
+# No external detection frameworks (MMDetection, etc.) are required

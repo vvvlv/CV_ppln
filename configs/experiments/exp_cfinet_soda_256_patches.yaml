@@ -1,21 +1,15 @@
-name: "exp_cfinet_soda_512_patches"
-description: "CFINet object detection on SODA-A dataset with 512x512 max patches (optimized for memory efficiency)"
+name: "exp_cfinet_soda_256_patches"
+description: "CFINet object detection on SODA-A dataset with 256x256 max patches (optimized for memory efficiency)"
 
-dataset: "configs/datasets/soda_a_coco_512_patches.yaml"
+dataset: "configs/datasets/soda_a_coco_256_patches.yaml"
 
 # Data loading
-# Patches are max 512x512, allowing for larger batch sizes
-# Original images split into ~100 patches (10x10) or ~80 patches (10x8)
+# Patches are max 256x256, allowing for larger batch sizes
+# Original images split into ~400 patches (20x20) or ~320 patches (20x16)
 data:
-  batch_size: 4  # Can use larger batch size with smaller patches
+  batch_size: 8  # Can use larger batch size with smaller patches
   num_workers: 4
   pin_memory: true
-  
-  # Limit dataset size for faster training/testing (optional)
-  # Set to null or omit to use full dataset
-  max_samples: 3500  # Limit training samples (e.g., 10000 for faster iteration)
-  max_val_samples: 750  # Limit validation samples (e.g., 1000)
-  max_test_samples: 750  # Limit test samples (e.g., 500)
   
   augmentation:
     enabled: true
@@ -36,7 +30,7 @@ model:
 
 # Training settings
 training:
-  epochs: 6
+  epochs: 12
   optimizer:
     type: "sgd"
     learning_rate: 0.01
@@ -65,7 +59,7 @@ evaluation:
 
 # Output
 output:
-  dir: "outputs/experiments/exp_cfinet_soda_512_patches"
+  dir: "outputs/experiments/exp_cfinet_soda_256_patches"
   save_predictions: true
 
 # Logging

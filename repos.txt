@@ -1,0 +1,886 @@
+Skip to content
+shaunyuan22
+SODA-mmrotate
+Repository navigation
+Code
+Issues
+4
+ (4)
+Pull requests
+Actions
+Projects
+Security
+Insights
+Owner avatar
+SODA-mmrotate
+Public
+forked from open-mmlab/mmrotate
+shaunyuan22/SODA-mmrotate
+Go to file
+t
+This branch is 36 commits ahead of and 15 commits behind open-mmlab/mmrotate:main.
+Name		
+shaunyuan22
+shaunyuan22
+Update README.md
+9e4c3bf
+ · 
+9 months ago
+.circleci
+Fix lint of dev branch (open-mmlab#578)
+4 years ago
+.dev_scripts
+Add .dev_scripts/gather_models.py (open-mmlab#162)
+4 years ago
+.github
+Update issue templates to main branch (open-mmlab#579)
+4 years ago
+configs
+Update sodaa.py
+3 years ago
+demo
+Update readme and install.md (open-mmlab#342)
+4 years ago
+docker
+bump mmdet min version to 2.22.0 (open-mmlab#270)
+4 years ago
+docs
+Bump mmcv's max version (open-mmlab#595)
+4 years ago
+mmrotate
+Update sodaa_eval.py
+9 months ago
+requirements
+Fix lint of dev branch (open-mmlab#578)
+4 years ago
+resources
+Upload the second part of the code by zy
+4 years ago
+tests
+[Algorithm] Support Rotated FCOS (ICCV'2019) (open-mmlab#223)
+4 years ago
+tools
+Update generate_wo_ignore.py
+2 years ago
+.gitattributes
+Upload the second part of the code by zy
+4 years ago
+.gitignore
+Fix bug in docstring. (open-mmlab#137)
+4 years ago
+.pre-commit-config.yaml
+Fix lint of dev branch (open-mmlab#578)
+4 years ago
+.pylintrc
+Upload the second part of the code by zy
+4 years ago
+.readthedocs.yml
+Upload the second part of the code by zy
+4 years ago
+CITATION.cff
+[Fix] Fix typos and bugs. (#3)
+4 years ago
+LICENSE
+first commit
+4 years ago
+MANIFEST.in
+Upload the second part of the code by zy
+4 years ago
+README.md
+Update README.md
+9 months ago
+README_zh-CN.md
+bump version to v0.3.3 (open-mmlab#580)
+4 years ago
+model-index.yml
+[Enhancement] Test mim in CI (open-mmlab#374)
+4 years ago
+requirements.txt
+Upload the second part of the code by zy
+4 years ago
+setup.cfg
+Fix lint of dev branch (open-mmlab#578)
+4 years ago
+setup.py
+[Fix] Fix mdformat version to support python3.6 & Add mim to extras_r…
+4 years ago
+Repository files navigation
+README
+Contributing
+License
+🌟🌟Update🌟🌟
+We STRONGLY recommend updating the evaluation codes (sodaa.py and sodaa_eval.py), which now support multi-processing and multi-GPU parallelism and significantly boosts the evaluation efficiency 🚀
+
+For intuitive comparison, we show the overall time cost before and after applying the updated evaluation script as follows.
+
+Step	Before	After
+Merge	~20m	~25s
+IoU Calculation	~1h30m	~105s
+Per Image Evaluation	~2h20m	~135s
+Accumulation	~17s	~17s
+Overall	~4h40m	~280s
+The results are tested on four RTX2080Ti GPUs with Rotated FCOS.
+
+Introduction
+This project is based on the open source object detection toolbox MMRotate, please refer to Installation for installation instructions first.
+
+The benchmark experiments work with Python 3.8, PyTorch 1.10 and mmrotate 0.3.0, and corresponding configs can be found at sodaa-benchmarks.
+
+Data preparation
+Please refer to tools/data/sodaa for more details.
+
+License
+Our SODA-A dataset is licensed under CC BY-NC 4.0, which means it is freely available for academic use only, and any commercial use is prohibited.
+
+Citation
+If you use our benchmark in your research, please cite this project.
+
+@ARTICLE{SODA,
+  author={Cheng, Gong and Yuan, Xiang and Yao, Xiwen and Yan, Kebing and Zeng, Qinghua and Xie, Xingxing and Han, Junwei},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, 
+  title={Towards Large-Scale Small Object Detection: Survey and Benchmarks}, 
+  year={2023},
+  volume={45},
+  number={11},
+  pages={13467-13488}
+}
+@inproceedings{zhou2022mmrotate,
+  title   = {MMRotate: A Rotated Object Detection Benchmark using PyTorch},
+  author  = {Zhou, Yue and Yang, Xue and Zhang, Gefan and Wang, Jiabao and Liu, Yanyi and
+             Hou, Liping and Jiang, Xue and Liu, Xingzhao and Yan, Junchi and Lyu, Chengqi and
+             Zhang, Wenwei and Chen, Kai},
+  booktitle={Proceedings of the 30th ACM International Conference on Multimedia},
+  year={2022}
+}
+About
+SODA-A Small Object Detection Toolbox and Benchmark
+
+shaunyuan22.github.io/SODA/
+Resources
+ Readme
+License
+ Apache-2.0 license
+Contributing
+ Contributing
+Citation
+ Activity
+Stars
+ 44 stars
+Watchers
+ 0 watching
+Forks
+ 9 forks
+Report repository
+Releases
+No releases published
+Packages
+No packages published
+Contributors
+No contributors
+Languages
+Python
+99.6%
+ 
+Other
+0.4%
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
+
+
+
+
+Skip to content
+open-mmlab
+mmrotate
+Repository navigation
+Code
+Issues
+264
+ (264)
+Pull requests
+38
+ (38)
+Discussions
+Actions
+Projects
+Security
+Insights
+Owner avatar
+mmrotate
+Public
+open-mmlab/mmrotate
+Go to file
+t
+Name		
+zytx121
+zytx121
+Revert "[Feature] Full angle range (#1061)" (#1071)
+b030f38
+ · 
+2 years ago
+.circleci
+fix circle ci (#715)
+3 years ago
+.dev_scripts
+Add .dev_scripts/gather_models.py (#162)
+4 years ago
+.github
+upgrade e2cnn version (#713)
+3 years ago
+configs
+Bump version to 0.3.2 (#397)
+4 years ago
+demo
+Update readme and install.md (#342)
+4 years ago
+docker
+bump mmdet min version to 2.22.0 (#270)
+4 years ago
+docs
+[Docs] Fix wrong zh_cn doc in customize_dataset.md (#852)
+3 years ago
+mmrotate
+Revert "[Feature] Full angle range (#1061)" (#1071)
+2 years ago
+requirements
+bump version to 0.3.4 (#714)
+3 years ago
+resources
+Upload the second part of the code by zy
+4 years ago
+tests
+Revert "[Feature] Full angle range (#1061)" (#1071)
+2 years ago
+tools
+support training mmrotate on NPU (#806)
+3 years ago
+.gitattributes
+Upload the second part of the code by zy
+4 years ago
+.gitignore
+Fix bug in docstring. (#137)
+4 years ago
+.pre-commit-config.yaml
+Fix lint of dev branch (#578)
+4 years ago
+.pylintrc
+Upload the second part of the code by zy
+4 years ago
+.readthedocs.yml
+Upload the second part of the code by zy
+4 years ago
+CITATION.cff
+[Fix] Fix typos and bugs. (#3)
+4 years ago
+LICENSE
+first commit
+4 years ago
+MANIFEST.in
+Upload the second part of the code by zy
+4 years ago
+README.md
+bump version to 0.3.4 (#714)
+3 years ago
+README_zh-CN.md
+bump version to 0.3.4 (#714)
+3 years ago
+model-index.yml
+[Enhancement] Test mim in CI (#374)
+4 years ago
+requirements.txt
+Upload the second part of the code by zy
+4 years ago
+setup.cfg
+Fix lint of dev branch (#578)
+4 years ago
+setup.py
+[Fix] Fix mdformat version to support python3.6 & Add mim to extras_r…
+4 years ago
+Repository files navigation
+README
+Contributing
+Apache-2.0 license
+
+ 
+OpenMMLab website HOT      OpenMMLab platform TRY IT OUT
+ 
+PyPI docs badge codecov license open issues issue resolution
+
+📘Documentation | 🛠️Installation | 👀Model Zoo | 🆕Update News | 🚀Ongoing Projects | 🤔Reporting Issues
+
+English | 简体中文
+
+Introduction
+MMRotate is an open-source toolbox for rotated object detection based on PyTorch. It is a part of the OpenMMLab project.
+
+The master branch works with PyTorch 1.6+.
+
+ video.MP4 
+Major Features
+Support multiple angle representations
+
+MMRotate provides three mainstream angle representations to meet different paper settings.
+
+Modular Design
+
+We decompose the rotated object detection framework into different components, which makes it much easy and flexible to build a new model by combining different modules.
+
+Strong baseline and State of the art
+
+The toolbox provides strong baselines and state-of-the-art methods in rotated object detection.
+
+What's New
+Highlight
+We are excited to announce our latest work on real-time object recognition tasks, RTMDet, a family of fully convolutional single-stage detectors. RTMDet not only achieves the best parameter-accuracy trade-off on object detection from tiny to extra-large model sizes but also obtains new state-of-the-art performance on instance segmentation and rotated object detection tasks. Details can be found in the technical report. Pre-trained models are here.
+
+PWC PWC PWC
+
+Task	Dataset	AP	FPS(TRT FP16 BS1 3090)
+Object Detection	COCO	52.8	322
+Instance Segmentation	COCO	44.6	188
+Rotated Object Detection	DOTA	78.9(single-scale)/81.3(multi-scale)	121
+
+0.3.4 was released in 01/02/2023:
+
+Fix compatibility with numpy, scikit-learn, and e2cnn.
+Support empty patch in Rotate Transform
+use iof for RRandomCrop validation
+Please refer to changelog.md for details and release history.
+
+Installation
+MMRotate depends on PyTorch, MMCV and MMDetection. Below are quick steps for installation. Please refer to Install Guide for more detailed instruction.
+
+conda create -n open-mmlab python=3.7 pytorch==1.7.0 cudatoolkit=10.1 torchvision -c pytorch -y
+conda activate open-mmlab
+pip install openmim
+mim install mmcv-full
+mim install mmdet
+git clone https://github.com/open-mmlab/mmrotate.git
+cd mmrotate
+pip install -r requirements/build.txt
+pip install -v -e .
+Get Started
+Please see get_started.md for the basic usage of MMRotate. We provide colab tutorial, and other tutorials for:
+
+learn the basics
+learn the config
+customize dataset
+customize model
+useful tools
+Model Zoo
+Results and models are available in the README.md of each method's config directory. A summary can be found in the Model Zoo page.
+
+Supported algorithms:
+ Rotated RetinaNet-OBB/HBB (ICCV'2017)
+ Rotated FasterRCNN-OBB (TPAMI'2017)
+ Rotated RepPoints-OBB (ICCV'2019)
+ Rotated FCOS (ICCV'2019)
+ RoI Transformer (CVPR'2019)
+ Gliding Vertex (TPAMI'2020)
+ Rotated ATSS-OBB (CVPR'2020)
+ CSL (ECCV'2020)
+ R3Det (AAAI'2021)
+ S2A-Net (TGRS'2021)
+ ReDet (CVPR'2021)
+ Beyond Bounding-Box (CVPR'2021)
+ Oriented R-CNN (ICCV'2021)
+ GWD (ICML'2021)
+ KLD (NeurIPS'2021)
+ SASM (AAAI'2022)
+ Oriented RepPoints (CVPR'2022)
+ KFIoU (arXiv)
+ G-Rep (stay tuned)
+Data Preparation
+Please refer to data_preparation.md to prepare the data.
+
+FAQ
+Please refer to FAQ for frequently asked questions.
+
+Contributing
+We appreciate all contributions to improve MMRotate. Please refer to CONTRIBUTING.md for the contributing guideline.
+
+Acknowledgement
+MMRotate is an open source project that is contributed by researchers and engineers from various colleges and companies. We appreciate all the contributors who implement their methods or add new features, as well as users who give valuable feedbacks. We wish that the toolbox and benchmark could serve the growing research community by providing a flexible toolkit to reimplement existing methods and develop their own new methods.
+
+Citation
+If you use this toolbox or benchmark in your research, please cite this project.
+
+@inproceedings{zhou2022mmrotate,
+  title   = {MMRotate: A Rotated Object Detection Benchmark using PyTorch},
+  author  = {Zhou, Yue and Yang, Xue and Zhang, Gefan and Wang, Jiabao and Liu, Yanyi and
+             Hou, Liping and Jiang, Xue and Liu, Xingzhao and Yan, Junchi and Lyu, Chengqi and
+             Zhang, Wenwei and Chen, Kai},
+  booktitle={Proceedings of the 30th ACM International Conference on Multimedia},
+  year={2022}
+}
+License
+This project is released under the Apache 2.0 license.
+
+Projects in OpenMMLab
+MMCV: OpenMMLab foundational library for computer vision.
+MIM: MIM installs OpenMMLab packages.
+MMClassification: OpenMMLab image classification toolbox and benchmark.
+MMDetection: OpenMMLab detection toolbox and benchmark.
+MMDetection3D: OpenMMLab's next-generation platform for general 3D object detection.
+MMRotate: OpenMMLab rotated object detection toolbox and benchmark.
+MMSegmentation: OpenMMLab semantic segmentation toolbox and benchmark.
+MMOCR: OpenMMLab text detection, recognition, and understanding toolbox.
+MMPose: OpenMMLab pose estimation toolbox and benchmark.
+MMHuman3D: OpenMMLab 3D human parametric model toolbox and benchmark.
+MMSelfSup: OpenMMLab self-supervised learning toolbox and benchmark.
+MMRazor: OpenMMLab model compression toolbox and benchmark.
+MMFewShot: OpenMMLab fewshot learning toolbox and benchmark.
+MMAction2: OpenMMLab's next-generation action understanding toolbox and benchmark.
+MMTracking: OpenMMLab video perception toolbox and benchmark.
+MMFlow: OpenMMLab optical flow toolbox and benchmark.
+MMEditing: OpenMMLab image and video editing toolbox.
+MMGeneration: OpenMMLab image and video generative models toolbox.
+MMDeploy: OpenMMLab model deployment framework.
+About
+OpenMMLab Rotated Object Detection Toolbox and Benchmark
+
+mmrotate.readthedocs.io/en/latest/
+Topics
+detection pytorch openmmlab rotated-object
+Resources
+ Readme
+License
+ Apache-2.0 license
+Contributing
+ Contributing
+Citation
+ Activity
+ Custom properties
+Stars
+ 2.1k stars
+Watchers
+ 17 watching
+Forks
+ 634 forks
+Report repository
+Releases 10
+v0.3.4
+Latest
+on Feb 1, 2023
++ 9 releases
+Packages
+No packages published
+Used by 152
+@trax-retail
+@turingmotors
+@WJHunag
+@yutakseo
+@fsabiu
+@dipanjans16
+@yuexiayiren159
+@matheuslafayette8
++ 144
+Contributors
+33
+@zytx121
+@yangxue0827
+@ZwwWayne
+@jbwang1997
+@nijkah
+@liuyanyi
+@RangiLyu
+@heiyuxiaokai
+@np-csu
+@DangChuong-DC
+@liufeinuaa
+@GamblerZSY
+@grimoire
+@calcoloergosum
++ 19 contributors
+Languages
+Python
+99.5%
+ 
+Other
+0.5%
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
+
+
+
+
+Skip to content
+shaunyuan22
+CFINet
+Repository navigation
+Code
+Issues
+12
+ (12)
+Pull requests
+Actions
+Projects
+Security
+Insights
+Owner avatar
+CFINet
+Public
+shaunyuan22/CFINet
+Go to file
+t
+Name		
+shaunyuan22
+shaunyuan22
+Update sodad_split.py
+45af342
+ · 
+2 years ago
+.circleci
+first commit
+3 years ago
+.dev_scripts
+first commit
+3 years ago
+.github
+first commit
+3 years ago
+CFINet
+first commit
+3 years ago
+configs
+Add files via upload
+3 years ago
+demo
+first commit
+3 years ago
+docker
+first commit
+3 years ago
+docs
+first commit
+3 years ago
+mmdet
+Add files via upload
+3 years ago
+requirements
+first commit
+3 years ago
+resources
+first commit
+3 years ago
+tests
+first commit
+3 years ago
+tools
+Update sodad_split.py
+2 years ago
+.gitignore
+first commit
+3 years ago
+.owners.yml
+first commit
+3 years ago
+.pre-commit-config.yaml
+first commit
+3 years ago
+.readthedocs.yml
+first commit
+3 years ago
+CITATION.cff
+first commit
+3 years ago
+LICENSE
+first commit
+3 years ago
+MANIFEST.in
+first commit
+3 years ago
+README.md
+Update README.md
+3 years ago
+model-index.yml
+first commit
+3 years ago
+pytest.ini
+first commit
+3 years ago
+requirements.txt
+first commit
+3 years ago
+setup.cfg
+first commit
+3 years ago
+setup.py
+first commit
+3 years ago
+Repository files navigation
+README
+Code of conduct
+Contributing
+Apache-2.0 license
+[ICCV 2023] Small Object Detection via Coarse-to-fine Proposal Generation and Imitation Learning
+📢 Introduction
+This is the official implementation of our paper titled "Small Object Detection via Coarse-to-fine Proposal Generation and Imitation Learning", which has been accepted by ICCV 2023.
+
+🎡 Dependencies
+CUDA 11.3
+Python 3.8
+PyTorch 1.10.0
+TorchVision 0.11.0
+mmcv-full 1.5.0
+numpy 1.22.4
+📂 Datasets
+Our work is based on the large-scale small object detection benchmark SODA, which comprises two sub datasets SODA-D and SODA-A. Download the dataset(s) from corresponding links below.
+
+SODA-D: OneDrvie; BaiduNetDisk
+SODA-A: OneDrvie; BaiduNetDisk
+The data preparation for SODA differs slightly from that of conventional object detection datasets, as it requires the initial step of splitting the original images. Srcipts to obtain sub-images of SODA-D can be found at tools/img_split. For SODA-A, please refer to SODA-mmrotate. More details about SODA please refer to the Dataset Homepage.
+
+🛠️ Install
+This repository is build on MMDetection 2.26.0 which can be installed by running the following scripts. Please ensure that all dependencies have been satisfied before setting up the environment.
+
+git clone https://github.com/shaunyuan22/CFINet
+cd CFINet
+pip install -v -e .
+Moreover, please refer to SODA-mmrotate for MMRotate installation if you want to perform evaluation on the SODA-A dataset.
+
+🚀 Training
+Single GPU:
+python ./tools/train.py ${CONFIG_FILE} 
+Multiple GPUs:
+bash ./tools/dist_train.sh ${CONFIG_FILE} ${GPU_NUM}
+📈 Evaluation
+Single GPU:
+python ./tools/test.py ${CONFIG_FILE} ${WORK_DIR} --eval bbox
+Multiple GPUs:
+bash ./tools/dist_test.sh ${CONFIG_FILE} ${WORK_DIR} ${GPU_NUM} --eval bbox
+🏆 Result
+Result on SODA-D
+Method	Schedule	
+A
+P
+A
+P
+50
+A
+P
+75
+A
+P
+e
+S
+A
+P
+r
+S
+A
+P
+g
+S
+A
+P
+N
+RetinaNet	
+1
+×
+28.2	57.6	23.7	11.9	25.2	34.1	44.2
+FCOS	
+1
+×
+23.9	49.5	19.9	6.9	19.4	30.9	40.9
+RepPoints	
+1
+×
+28.0	55.6	24.7	10.1	23.8	35.1	45.3
+ATSS	
+1
+×
+26.8	55.6	22.1	11.7	23.9	32.2	41.3
+YOLOX	
+70
+e
+26.7	53.4	23.0	13.6	25.1	30.9	30.4
+CornerNet	
+2
+×
+24.6	49.5	21.7	6.5	20.5	32.2	43.8
+CenterNet	
+70
+e
+21.5	48.8	15.6	5.1	16.2	29.6	42.4
+Deformable-DETR	
+50
+e
+19.2	44.8	13.7	6.3	15.4	24.9	34.2
+Sparse RCNN	
+1
+×
+24.2	50.3	20.3	8.8	20.4	30.2	39.4
+Faster RCNN	
+1
+×
+28.9	59.4	24.1	13.8	25.7	34.5	43.0
+Cascade RPN	
+1
+×
+29.1	56.5	25.9	12.5	25.5	35.4	44.7
+RFLA	
+1
+×
+29.7	60.2	25.2	13.2	26.9	35.4	44.6
+Ours	
+1
+×
+30.7	60.8	26.7	14.7	27.8	36.4	44.6
+Result on SODA-A
+Method	Schedule	
+A
+P
+A
+P
+50
+A
+P
+75
+A
+P
+e
+S
+A
+P
+r
+S
+A
+P
+g
+S
+A
+P
+N
+Rotated RetinaNet	
+1
+×
+26.8	63.4	16.2	9.1	22.0	35.4	28.2
+S
+2
+ A-Net	
+1
+×
+28.3	69.6	13.1	10.2	22.8	35.8	29.5
+Oriented RepPoints	
+1
+×
+26.3	58.8	19.0	9.4	22.6	32.4	28.5
+DHRec	
+1
+×
+30.1	68.8	19.8	10.6	24.6	40.3	34.6
+Rotated Faster RCNN	
+1
+×
+32.5	70.1	24.3	11.9	27.3	42.2	34.4
+Gliding Vertex	
+1
+×
+31.7	70.8	22.6	11.7	27.0	41.1	33.8
+Oriented RCNN	
+1
+×
+34.4	70.7	28.6	12.5	28.6	44.5	36.7
+DODet	
+1
+×
+31.6	68.1	23.4	11.3	26.3	41.0	33.5
+Ours	
+1
+×
+34.4	73.1	26.1	13.5	29.3	44.0	35.9
+📚 Citation
+Please cite our work if you find our work and codes helpful for your research.
+
+@InProceedings{CFINet,
+    author    = {Yuan, Xiang and Cheng, Gong and Yan, Kebing and Zeng, Qinghua and Han, Junwei},
+    title     = {Small Object Detection via Coarse-to-fine Proposal Generation and Imitation Learning},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    month     = {October},
+    year      = {2023},
+    pages     = {6317-6327}
+}
+
+@ARTICLE{SODA,
+  author={Cheng, Gong and Yuan, Xiang and Yao, Xiwen and Yan, Kebing and Zeng, Qinghua and Xie, Xingxing and Han, Junwei},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, 
+  title={Towards Large-Scale Small Object Detection: Survey and Benchmarks}, 
+  year={2023},
+  volume={45},
+  number={11},
+  pages={13467-13488}
+}
+📧 Contact
+If you have any problems about this repo or SODA benchmark, please be free to contact us at shaunyuan@mail.nwpu.edu.cn 😉
+
+About
+The official implementation for ICCV'23 paper "Small Object Detection via Coarse-to-fine Proposal Generation and Imitation Learning"
+
+Topics
+object-detection small-object-detection cfinet
+Resources
+ Readme
+License
+ Apache-2.0 license
+Code of conduct
+ Code of conduct
+Contributing
+ Contributing
+Citation
+ Activity
+Stars
+ 161 stars
+Watchers
+ 2 watching
+Forks
+ 8 forks
+Report repository
+Releases
+No releases published
+Packages
+No packages published
+Contributors
+1
+@shaunyuan22
+shaunyuan22 Shaun Yuan
+Languages
+Python
+99.0%
+ 
+Other
+1.0%
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
+
+

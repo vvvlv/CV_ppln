@@ -24,6 +24,7 @@ class COCODataset(Dataset):
         normalize: bool = True,
         augmentation: Optional[dict] = None,
         min_size: int = 1,
+        max_samples: Optional[int] = None,
     ):
         """
         Initialize COCO dataset.
@@ -38,6 +39,7 @@ class COCODataset(Dataset):
             normalize: Whether to normalize images
             augmentation: Augmentation configuration dict
             min_size: Minimum bbox size to keep (filter out tiny boxes)
+            max_samples: Optional maximum number of samples to use (for faster training/testing)
         """
         self.root_dir = Path(root_dir)
         self.split = split
@@ -46,6 +48,7 @@ class COCODataset(Dataset):
         self.std = np.array(std, dtype=np.float32)
         self.normalize = normalize
         self.min_size = min_size
+        self.max_samples = max_samples
         self.augmentation = augmentation or {}
         # Enable augmentation if enabled in config and split name contains 'train'
         # This supports both 'train' and 'train_patches' etc.
@@ -76,6 +79,12 @@ class COCODataset(Dataset):
         # Support both 'train' and 'train_patches' etc.
         if 'train' in split:
             self.image_ids = [img_id for img_id in self.image_ids if img_id in self.image_to_anns]
+        
+        # Limit number of samples if max_samples is specified
+        if self.max_samples is not None and self.max_samples > 0:
+            original_count = len(self.image_ids)
+            self.image_ids = self.image_ids[:self.max_samples]
+            print(f"Limited {split} split to {len(self.image_ids)} samples (from {original_count})")
         
         print(f"Loaded {len(self.image_ids)} images for {split} split")
         print(f"Categories: {len(self.categories)}")
