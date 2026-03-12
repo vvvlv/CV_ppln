@@ -1,0 +1,28 @@
+name: "SODA_A_coco_512_patches"
+description: "SODA-A dataset in COCO format with 512x512 max patches (for training on less powerful systems)"
+
+format: "coco"  # Indicates this is a detection dataset
+
+paths:
+  root: "/home/vlv/Documents/master/computervision/SODA_dataset/SODA_A_coco_512"
+  train: "train_patches"  # Use train_patches directory
+  val: "val_patches"      # Use val_patches directory
+  test: "test_patches"    # Use test_patches directory
+
+annotation_file: "_annotations.coco.json"
+
+# Image preprocessing
+# Patches are created with max size 512x512
+# Original images are split into patches (10x10 grid for 4800x4800, 10x8 for 4800x3670)
+# Patches are approximately ~480x480 or ~480x458
+# We resize to a fixed size for training (required for batching)
+image_size: [512, 512]  # Fixed size for training (H, W format) - matches max patch size
+num_channels: 3
+num_classes: 9  # SODA-A has 9 detection classes (excluding 'ignore' category)
+
+# Normalization (ImageNet stats)
+mean: [0.485, 0.456, 0.406]
+std: [0.229, 0.224, 0.225]
+
+# Minimum bbox size to keep (filter tiny boxes)
+min_bbox_size: 1

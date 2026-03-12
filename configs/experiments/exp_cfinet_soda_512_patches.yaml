@@ -1,14 +1,14 @@
-name: "exp_cfinet_soda_patches"
-description: "CFINet object detection on SODA-A dataset with patched images (2x2 patches for reduced memory usage)"
+name: "exp_cfinet_soda_512_patches"
+description: "CFINet object detection on SODA-A dataset with 512x512 max patches (optimized for memory efficiency)"
 
-dataset: "configs/datasets/soda_a_coco_patches.yaml"
+dataset: "configs/datasets/soda_a_coco_512_patches.yaml"
 
 # Data loading
-# Note: Patches are smaller than original images, so you may be able to increase batch_size
-# Original images: ~4800x2744, Patches: ~2400x1372 (approximately half the size)
+# Patches are max 512x512, allowing for larger batch sizes
+# Original images split into ~100 patches (10x10) or ~80 patches (10x8)
 data:
-  batch_size: 4  # Increased to provide more proposals for CFINet's contrastive sampling
-  num_workers: 2
+  batch_size: 8  # Can use larger batch size with smaller patches
+  num_workers: 4
   pin_memory: true
   
   augmentation:
@@ -23,7 +23,7 @@ data:
 # Model architecture
 model:
   type: "CFINet"
-  config_file: null  # null = use default embedded config. Or provide path to custom config file.
+  config_file: null  # null = use default embedded config. Or provide path to custom config file. Do not touch this
   checkpoint: null  # Set to checkpoint path if resuming training
   num_classes: 9
   device: "cuda"
@@ -59,7 +59,7 @@ evaluation:
 
 # Output
 output:
-  dir: "outputs/experiments/exp_cfinet_soda_patches"
+  dir: "outputs/experiments/exp_cfinet_soda_512_patches"
   save_predictions: true
 
 # Logging

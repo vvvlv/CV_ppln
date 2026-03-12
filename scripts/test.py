@@ -1,212 +1,171 @@
-"""Testing/Inference script for evaluating trained models."""
+"""Testing / inference script for COCO-format object detection experiments."""
 
 import sys
 import argparse
-from pathlib import Path
 import json
-import yaml
-import torch
-import cv2
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import numpy as np
+import torch
 from tqdm import tqdm
 
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from utils.config import load_config
-from utils.tensorboard_logger import TensorBoardLogger
 from data import create_dataloaders
 from models import create_model
-from training.metrics import create_metrics
+from training.detection_metrics import create_metrics
 
 
-def test(config_path: str, checkpoint_path: str = None, output_dir: str = None):
-    """Run inference and testing on test set.
-    
-    Args:
-        config_path: Path to experiment config file
-        checkpoint_path: Path to checkpoint file (default: best.pth from experiment)
-        output_dir: Output directory for predictions (default: outputs/tests/<experiment_name>)
-    """
-    
-    # Load config
+def _to_numpy(x: Any, dtype=None) -> np.ndarray:
+    arr = np.asarray(x)
+    if dtype is not None:
+        arr = arr.astype(dtype)
+    return arr
+
+
+def test(
+    config_path: str,
+    checkpoint_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+) -> Dict[str, float]:
     config = load_config(config_path)
-    experiment_name = config['name']
-    
-    print(f"\n{'='*60}")
-    print(f"Testing: {experiment_name}")
-    print(f"{'='*60}")
-    
-    # Create model
-    device = torch.device(config['device'] if torch.cuda.is_available() else 'cpu')
-    print(f"Device: {device}")
-    model = create_model(config)
-    
-    # Load checkpoint
-    if checkpoint_path is None:
-        checkpoint_path = Path(config['output']['dir']) / 'checkpoints' / 'best.pth'
-    
-    checkpoint_path = Path(checkpoint_path)
-    print(f"Loading checkpoint: {checkpoint_path}")
-    
-    if not checkpoint_path.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-    
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model = model.to(device)
+    exp_name = config.get("name", Path(config_path).stem)
+
+    dataset_cfg = config.get("dataset", {})
+    is_detection = dataset_cfg.get("format") == "coco" or "annotation_file" in dataset_cfg
+    if not is_detection:
+        raise ValueError("This pipeline only supports COCO-format object detection experiments.")
+
+    # Device
+    if str(config.get("device", "cuda")).startswith("cuda") and torch.cuda.is_available():
+        device = torch.device(config["device"])
+    else:
+        device = torch.device("cpu")
+
+    print(f"\n{'='*70}")
+    print(f"Testing: {exp_name}")
+    print(f"Device : {device}")
+    print(f"{'='*70}")
+
+    # Model
+    model = create_model(config).to(device)
     model.eval()
-    
-    print(f"Loaded checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
-    
-    # Create test loader
+
+    # Checkpoint
+    if checkpoint_path is None:
+        checkpoint_path = str(Path(config["output"]["dir"]) / "checkpoints" / "best.pth")
+    ckpt_path = Path(checkpoint_path)
+    if not ckpt_path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+
+    print(f"Loading checkpoint: {ckpt_path}")
+    checkpoint = torch.load(ckpt_path, map_location=device)
+    model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+
+    # Data
     _, _, test_loader = create_dataloaders(config)
     print(f"Test samples: {len(test_loader.dataset)}")
-    
-    # Create metrics
-    metrics = create_metrics(config['training']['metrics'])
-    
-    # Setup output directory
+
+    # Output dir
     if output_dir is None:
-        output_dir = Path('outputs/tests') / experiment_name
+        out_dir = Path("outputs/tests") / exp_name
     else:
-        output_dir = Path(output_dir)
-    
-    output_dir.mkdir(parents=True, exist_ok=True)
-    pred_dir = output_dir / 'predictions'
-    pred_dir.mkdir(exist_ok=True)
-    
-    print(f"Saving predictions to: {pred_dir}")
-    
-    # Test
-    metric_sums = {name: 0 for name in config['training']['metrics']}
-    per_image_metrics = []
-    
+        out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Evaluation settings
+    score_thr = float(config.get("evaluation", {}).get("score_threshold", 0.05))
+    metrics = create_metrics(config.get("training", {}).get("metrics", ["mAP"]))
+
+    # Accumulators
+    pred_bboxes_all: List[np.ndarray] = []
+    pred_labels_all: List[np.ndarray] = []
+    pred_scores_all: List[np.ndarray] = []
+    gt_bboxes_all: List[np.ndarray] = []
+    gt_labels_all: List[np.ndarray] = []
+    per_image: List[Dict[str, Any]] = []
+
     print("\nRunning inference...")
     with torch.no_grad():
         for batch in tqdm(test_loader, desc="Testing"):
-            images = batch['image'].to(device) if isinstance(batch['image'], torch.Tensor) else torch.from_numpy(batch['image']).to(device)
-            masks = batch['mask'].to(device) if isinstance(batch['mask'], torch.Tensor) else torch.from_numpy(batch['mask']).to(device)
-            names = batch['name']
-            
-            # Run inference
-            outputs = model(images)
-            
-            # Calculate metrics for each image
-            for i, name in enumerate(names):
-                image_metrics = {'image': name}
-                
-                for metric_name, metric_fn in metrics.items():
-                    # Calculate metric for single image (already returns float)
-                    metric_value = metric_fn(outputs[i:i+1], masks[i:i+1])
-                    image_metrics[metric_name] = float(metric_value)
-                    metric_sums[metric_name] += metric_value
-                
-                per_image_metrics.append(image_metrics)
-                
-                # Save prediction
-                pred = outputs[i, 0].cpu().numpy()
-                pred_binary = (pred > 0.5).astype(np.uint8) * 255
-                cv2.imwrite(str(pred_dir / name), pred_binary)
-    
-    # Calculate average metrics
-    n = len(test_loader.dataset)
-    avg_metrics = {k: float(v / n) for k, v in metric_sums.items()}
-    
-    # Print results
-    print("\n" + "=" * 60)
-    print("Test Results:")
-    print("=" * 60)
-    for name, value in avg_metrics.items():
-        print(f"  {name.upper()}: {value:.4f}")
-    print("=" * 60)
-    
-    # Save average metrics
-    metrics_summary = {
-        'experiment': experiment_name,
-        'checkpoint': str(checkpoint_path),
-        'num_test_images': n,
-        'average_metrics': avg_metrics
-    }
-    
-    summary_path = output_dir / 'test_metrics.yaml'
-    with open(summary_path, 'w') as f:
-        yaml.dump(metrics_summary, f, default_flow_style=False, sort_keys=False)
-    print(f"\nMetrics summary saved to: {summary_path}")
-    
-    # Save per-image metrics
-    per_image_path = output_dir / 'per_image_metrics.yaml'
-    with open(per_image_path, 'w') as f:
-        yaml.dump(per_image_metrics, f, default_flow_style=False, sort_keys=False)
-    print(f"Per-image metrics saved to: {per_image_path}")
-    
-    print(f"\nPredicted masks saved to: {pred_dir}")
-    
-    # Log test results to TensorBoard (if enabled in config)
-    if config.get('logging', {}).get('tensorboard', False):
-        tb_log_dir = Path(config['output']['dir']) / 'tensorboard' / 'test'
-        with TensorBoardLogger(str(tb_log_dir), enabled=True) as tb_logger:
-            # Log test metrics as scalars
-            for metric_name, value in avg_metrics.items():
-                tb_logger.log_scalar(f'test/{metric_name}', value, 0)
-            
-            # Log some sample predictions
-            if config.get('logging', {}).get('log_images', False):
-                print("\nLogging sample predictions to TensorBoard...")
-                # Get a few samples from test set
-                sample_images = []
-                sample_gt = []
-                sample_pred = []
-                
-                # Re-run inference on first batch to get samples
-                test_iter = iter(test_loader)
-                for i in range(min(4, len(test_loader))):
-                    try:
-                        batch = next(test_iter)
-                        images = batch['image'].to(device) if isinstance(batch['image'], torch.Tensor) else torch.from_numpy(batch['image']).to(device)
-                        masks = batch['mask'].to(device) if isinstance(batch['mask'], torch.Tensor) else torch.from_numpy(batch['mask']).to(device)
-                        
-                        with torch.no_grad():
-                            outputs = model(images)
-                        
-                        sample_images.append(images[0])
-                        sample_gt.append(masks[0])
-                        sample_pred.append(outputs[0])
-                    except StopIteration:
-                        break
-                
-                if sample_images:
-                    sample_images = torch.stack(sample_images)
-                    sample_gt = torch.stack(sample_gt)
-                    sample_pred = torch.stack(sample_pred)
-                    
-                    dataset_config = config.get('dataset', {})
-                    mean = dataset_config.get('mean', [0.485, 0.456, 0.406])
-                    std = dataset_config.get('std', [0.229, 0.224, 0.225])
-                    
-                    tb_logger.log_images(
-                        tag='test/predictions',
-                        images=sample_images,
-                        masks_gt=sample_gt,
-                        masks_pred=sample_pred,
-                        step=0,
-                        max_images=4,
-                        denormalize=True,
-                        mean=mean,
-                        std=std
-                    )
-            
-            print("TensorBoard test logs saved.")
-    
-    print(f"\n✓ Testing complete!")
-    
-    return avg_metrics, per_image_metrics
+            images = batch["image"].to(device)
+            gt_bboxes = batch["bboxes"]
+            gt_labels = batch["labels"]
+            image_ids = batch.get("image_id", [None] * images.shape[0])
+            image_names = batch.get("image_name", [None] * images.shape[0])
+
+            # Predict
+            if hasattr(model, "predict"):
+                preds = model.predict(images, score_threshold=score_thr)
+            else:
+                raise RuntimeError("Model does not implement predict(); cannot format detections.")
+
+            for i in range(len(preds)):
+                pb = _to_numpy(preds[i]["bboxes"], np.float32)
+                pl = _to_numpy(preds[i]["labels"], np.int64)
+                ps = _to_numpy(preds[i]["scores"], np.float32)
+
+                gb = gt_bboxes[i].detach().cpu().numpy().astype(np.float32)
+                gl = gt_labels[i].detach().cpu().numpy().astype(np.int64)
+
+                pred_bboxes_all.append(pb)
+                pred_labels_all.append(pl)
+                pred_scores_all.append(ps)
+                gt_bboxes_all.append(gb)
+                gt_labels_all.append(gl)
+
+                per_image.append(
+                    {
+                        "image_id": image_ids[i],
+                        "image_name": image_names[i],
+                        "pred_bboxes_xyxy": pb.tolist(),
+                        "pred_scores": ps.tolist(),
+                        "pred_labels": pl.tolist(),
+                        "gt_bboxes_xyxy": gb.tolist(),
+                        "gt_labels": gl.tolist(),
+                    }
+                )
+
+    # Metrics
+    results: Dict[str, float] = {}
+    for name, fn in metrics.items():
+        results[name] = float(
+            fn(pred_bboxes_all, pred_labels_all, pred_scores_all, gt_bboxes_all, gt_labels_all)
+        )
+
+    # Save
+    with open(out_dir / "predictions.json", "w") as f:
+        json.dump(
+            {
+                "experiment": exp_name,
+                "checkpoint": str(ckpt_path),
+                "score_threshold": score_thr,
+                "metrics": results,
+                "per_image": per_image,
+            },
+            f,
+            indent=2,
+        )
+
+    print("\n" + "=" * 70)
+    print("Test metrics:")
+    for k, v in results.items():
+        print(f"  {k}: {v:.4f}")
+    print("=" * 70)
+    print(f"\n✓ Saved: {out_dir / 'predictions.json'}")
+
+    return results
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run inference and evaluate model on test set')
-    parser.add_argument('--config', required=True, help='Path to experiment config file')
-    parser.add_argument('--checkpoint', default=None, help='Path to checkpoint (default: best.pth from experiment)')
-    parser.add_argument('--output-dir', default=None, help='Output directory for predictions (default: outputs/tests/<exp_name>)')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Evaluate a detection model on the test split (COCO format).")
+    parser.add_argument("--config", required=True, help="Path to experiment config file")
+    parser.add_argument("--checkpoint", default=None, help="Path to checkpoint (default: <exp_output>/checkpoints/best.pth)")
+    parser.add_argument("--output-dir", default=None, help="Output directory (default: outputs/tests/<exp_name>)")
     args = parser.parse_args()
-    
-    test(args.config, args.checkpoint, args.output_dir) 
+
+    test(args.config, args.checkpoint, args.output_dir)
+

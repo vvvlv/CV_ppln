@@ -1,4 +1,4 @@
-"""Main training script."""
+"""Main training script (object detection focused)."""
 
 import sys
 import argparse
@@ -15,8 +15,6 @@ from utils.tensorboard_logger import TensorBoardLogger
 from utils.memory_profiler import print_memory_report, profile_training_step_memory
 from data import create_dataloaders
 from models import create_model
-from training.trainer import Trainer
-from training.losses import create_loss
 
 
 def main(config_path: str):
@@ -79,17 +77,10 @@ def main(config_path: str):
         
         # Optional: Profile actual training step
         if config.get('debug', {}).get('profile_training_step', False) and device.type == 'cuda':
-            criterion = create_loss(config['training']['loss'])
-            optimizer = torch.optim.Adam(model_on_device.parameters(), lr=0.001)  # Temporary optimizer
-            profile_training_step_memory(
-                model_on_device,
-                train_loader,
-                device,
-                criterion,
-                optimizer
+            print(
+                "Note: debug.profile_training_step is not supported for detection models in this streamlined pipeline "
+                "(loss computation is model-internal). Skipping."
             )
-            del optimizer, criterion
-            torch.cuda.empty_cache()
         
         model = model_on_device
     else:
@@ -101,8 +92,7 @@ def main(config_path: str):
         tb_log_dir = output_dir / 'tensorboard'
         tb_logger = TensorBoardLogger(str(tb_log_dir), enabled=True)
     
-    # Create trainer and train
-    # Check if this is a detection task
+    # Create trainer and train (object detection)
     is_detection = config['dataset'].get('format') == 'coco' or 'annotation_file' in config['dataset']
     
     try:
@@ -110,8 +100,10 @@ def main(config_path: str):
             from training.detection_trainer import DetectionTrainer
             trainer = DetectionTrainer(model, train_loader, val_loader, config, device, tb_logger)
         else:
-            from training.trainer import Trainer
-            trainer = Trainer(model, train_loader, val_loader, config, device, tb_logger)
+            raise ValueError(
+                "This pipeline has been streamlined for object detection (COCO-format datasets). "
+                "Please set dataset.format: 'coco' (or provide dataset.annotation_file)."
+            )
         trainer.train()
     finally:
         # Ensure TensorBoard logger is properly closed
@@ -122,7 +114,7 @@ def main(config_path: str):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Train vessel segmentation model')
+    parser = argparse.ArgumentParser(description='Train object detection model (COCO format)')
     parser.add_argument(
         '--config', 
         type=str, 

@@ -30,9 +30,12 @@ class DetectionTrainer:
         
         # Training state
         self.current_epoch = 0
-        self.best_metric = float('-inf')
         self.early_stop_counter = 0
         self.metrics_history: List[Dict] = []
+
+        # Track "best" separately for checkpointing vs early-stopping (they may monitor different metrics)
+        self.best_checkpoint_metric = None
+        self.best_early_stop_metric = None
         
         # Create output directory
         self.output_dir = Path(config['output']['dir'])
@@ -191,6 +194,15 @@ class DetectionTrainer:
         total_loss = 0
         loss_components = {}
         num_batches = 0
+
+        # For detection metrics (e.g., mAP)
+        pred_bboxes_all: List[np.ndarray] = []
+        pred_labels_all: List[np.ndarray] = []
+        pred_scores_all: List[np.ndarray] = []
+        gt_bboxes_all: List[np.ndarray] = []
+        gt_labels_all: List[np.ndarray] = []
+
+        score_thr = float(self.config.get('evaluation', {}).get('score_threshold', 0.05))
         
         with torch.no_grad():
             for batch in tqdm(self.val_loader, desc=f"Epoch {self.current_epoch + 1} [Val]"):
@@ -254,13 +266,54 @@ class DetectionTrainer:
                             loss_components[key] += float(value)
                 
                 num_batches += 1
+
+                # Optional: compute detection metrics by running inference (no targets)
+                if self.metrics:
+                    # Prefer model.predict() if present (it returns numpy arrays)
+                    if hasattr(self.model, 'predict'):
+                        preds = self.model.predict(images, score_threshold=score_thr)
+                    else:
+                        # Fallback: assume forward(images) returns already-formatted predictions
+                        preds = self.model(images)
+
+                    for i in range(len(preds)):
+                        pred_bboxes_all.append(np.asarray(preds[i].get('bboxes', []), dtype=np.float32))
+                        pred_labels_all.append(np.asarray(preds[i].get('labels', []), dtype=np.int64))
+                        pred_scores_all.append(np.asarray(preds[i].get('scores', []), dtype=np.float32))
+
+                    for i in range(len(bboxes)):
+                        gt_bboxes_all.append(bboxes[i].detach().cpu().numpy().astype(np.float32))
+                        gt_labels_all.append(labels[i].detach().cpu().numpy().astype(np.int64))
         
         # Average
         metrics = {'val_loss': total_loss / num_batches}
         for key, value in loss_components.items():
             metrics[f'val_{key}'] = value / num_batches
+
+        # Compute configured detection metrics
+        for metric_name, metric_fn in (self.metrics or {}).items():
+            try:
+                val_metric = metric_fn(
+                    pred_bboxes_all,
+                    pred_labels_all,
+                    pred_scores_all,
+                    gt_bboxes_all,
+                    gt_labels_all,
+                )
+                metrics[f'val_{metric_name}'] = float(val_metric)
+            except Exception as e:
+                print(f"Warning: failed to compute metric '{metric_name}': {e}")
         
         return metrics
+
+    @staticmethod
+    def _is_better(current: float, best: float, mode: str) -> bool:
+        """Return True if current is better than best under mode ('min' or 'max')."""
+        if mode == 'min':
+            return current < best
+        if mode == 'max':
+            return current > best
+        raise ValueError(f"Unknown mode: {mode} (expected 'min' or 'max')")
     
     def _create_optimizer(self):
         """Create optimizer from config."""
@@ -313,11 +366,21 @@ class DetectionTrainer:
         """Save checkpoints."""
         ckpt_cfg = self.config['training']['checkpoint']
         metric_name = ckpt_cfg['monitor']
-        current_metric = metrics[metric_name]
+        if metric_name not in metrics:
+            raise KeyError(f"Checkpoint monitor metric '{metric_name}' not found in metrics: {list(metrics.keys())}")
+        current_metric = float(metrics[metric_name])
+        mode = ckpt_cfg.get('mode')
+        if mode is None:
+            # Sensible default: losses -> min, everything else -> max
+            mode = 'min' if 'loss' in metric_name.lower() else 'max'
         
+        # Initialize best metric if needed
+        if self.best_checkpoint_metric is None:
+            self.best_checkpoint_metric = float('inf') if mode == 'min' else float('-inf')
+
         # Save best
-        if ckpt_cfg['save_best'] and current_metric > self.best_metric:
-            self.best_metric = current_metric
+        if ckpt_cfg['save_best'] and self._is_better(current_metric, self.best_checkpoint_metric, mode):
+            self.best_checkpoint_metric = current_metric
             self._save_checkpoint('best.pth')
             print(f"  → New best {metric_name}: {current_metric:.4f}")
         
@@ -332,7 +395,7 @@ class DetectionTrainer:
             'epoch': self.current_epoch,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'best_metric': self.best_metric
+            'best_checkpoint_metric': self.best_checkpoint_metric
         }, ckpt_dir / filename)
     
     def _check_early_stopping(self, metrics: Dict[str, float]) -> bool:
@@ -342,15 +405,22 @@ class DetectionTrainer:
             return False
         
         metric_name = es_cfg['monitor']
-        current_metric = metrics[metric_name]
-        
-        if current_metric >= self.best_metric - 1e-8:
+        if metric_name not in metrics:
+            raise KeyError(f"Early-stopping monitor metric '{metric_name}' not found in metrics: {list(metrics.keys())}")
+        current_metric = float(metrics[metric_name])
+        mode = es_cfg.get('mode', 'min' if 'loss' in metric_name.lower() else 'max')
+
+        if self.best_early_stop_metric is None:
+            self.best_early_stop_metric = float('inf') if mode == 'min' else float('-inf')
+
+        if self._is_better(current_metric, self.best_early_stop_metric, mode):
+            self.best_early_stop_metric = current_metric
             self.early_stop_counter = 0
             return False
-        else:
-            self.early_stop_counter += 1
-            print(f"  → Early stopping: {self.early_stop_counter}/{es_cfg['patience']} (no improvement in {metric_name})")
-            return self.early_stop_counter >= es_cfg['patience']
+
+        self.early_stop_counter += 1
+        print(f"  → Early stopping: {self.early_stop_counter}/{es_cfg['patience']} (no improvement in {metric_name})")
+        return self.early_stop_counter >= es_cfg['patience']
     
     def _save_metrics_history(self):
         """Save metrics history to YAML file."""
@@ -390,6 +460,8 @@ class DetectionTrainer:
             final_metrics[f'final_val_{clean_name}'] = float(v)
         
         monitor_metric = self.config['training']['checkpoint']['monitor']
-        final_metrics['best_' + monitor_metric.replace('val_', '')] = float(self.best_metric)
+        final_metrics['best_' + monitor_metric.replace('val_', '')] = float(
+            self.best_checkpoint_metric if self.best_checkpoint_metric is not None else 0.0
+        )
         
         self.tb_logger.log_hyperparameters(hparams, final_metrics)

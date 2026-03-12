@@ -27,49 +27,41 @@ def calculate_iou(bbox1: np.ndarray, bbox2: np.ndarray) -> float:
     return intersection / union
 
 
-def calculate_ap_per_class(
+def calculate_ap(
     pred_bboxes: List[np.ndarray],
-    pred_labels: List[np.ndarray],
     pred_scores: List[np.ndarray],
     gt_bboxes: List[np.ndarray],
-    gt_labels: List[np.ndarray],
-    iou_threshold: float = 0.5
+    iou_threshold: float = 0.5,
 ) -> float:
-    """Calculate Average Precision (AP) for a single class."""
-    # Group predictions and ground truth by class
-    # For simplicity, assume single class or aggregate all classes
-    all_pred_boxes = []
-    all_pred_scores = []
-    all_gt_boxes = []
-    
+    """Calculate Average Precision (AP) at a fixed IoU threshold for one class."""
+    all_pred_boxes: List[np.ndarray] = []
+    all_pred_scores: List[float] = []
+    all_gt_boxes: List[np.ndarray] = []
+
+    for i in range(len(gt_bboxes)):
+        if len(gt_bboxes[i]) > 0:
+            all_gt_boxes.extend(list(gt_bboxes[i]))
+
     for i in range(len(pred_bboxes)):
         for j in range(len(pred_bboxes[i])):
             all_pred_boxes.append(pred_bboxes[i][j])
-            all_pred_scores.append(pred_scores[i][j] if len(pred_scores[i]) > j else 1.0)
-        
-        for j in range(len(gt_bboxes[i])):
-            all_gt_boxes.append(gt_bboxes[i][j])
-    
-    if len(all_gt_boxes) == 0:
+            all_pred_scores.append(float(pred_scores[i][j]) if len(pred_scores[i]) > j else 1.0)
+
+    if len(all_gt_boxes) == 0 or len(all_pred_boxes) == 0:
         return 0.0
-    
-    if len(all_pred_boxes) == 0:
-        return 0.0
-    
-    # Sort predictions by score
+
+    # Sort predictions by score desc
     sorted_indices = np.argsort(all_pred_scores)[::-1]
-    all_pred_boxes = np.array(all_pred_boxes)[sorted_indices]
-    all_pred_scores = np.array(all_pred_scores)[sorted_indices]
-    
-    # Match predictions to ground truth
+    all_pred_boxes = np.asarray(all_pred_boxes, dtype=np.float32)[sorted_indices]
+
+    # Match predictions to GT (greedy 1-to-1)
     gt_matched = [False] * len(all_gt_boxes)
-    tp = []
-    fp = []
-    
-    for pred_box in all_pred_boxes:
+    tp = np.zeros((len(all_pred_boxes),), dtype=np.float32)
+    fp = np.zeros((len(all_pred_boxes),), dtype=np.float32)
+
+    for k, pred_box in enumerate(all_pred_boxes):
         best_iou = 0.0
         best_gt_idx = -1
-        
         for gt_idx, gt_box in enumerate(all_gt_boxes):
             if gt_matched[gt_idx]:
                 continue
@@ -77,31 +69,25 @@ def calculate_ap_per_class(
             if iou > best_iou:
                 best_iou = iou
                 best_gt_idx = gt_idx
-        
-        if best_iou >= iou_threshold:
-            tp.append(1)
-            fp.append(0)
+
+        if best_iou >= iou_threshold and best_gt_idx >= 0:
+            tp[k] = 1.0
             gt_matched[best_gt_idx] = True
         else:
-            tp.append(0)
-            fp.append(1)
-    
-    # Calculate precision and recall
-    tp = np.cumsum(tp)
-    fp = np.cumsum(fp)
-    recalls = tp / len(all_gt_boxes)
-    precisions = tp / (tp + fp + 1e-8)
-    
-    # Calculate AP using 11-point interpolation
+            fp[k] = 1.0
+
+    tp_cum = np.cumsum(tp)
+    fp_cum = np.cumsum(fp)
+    recalls = tp_cum / (len(all_gt_boxes) + 1e-8)
+    precisions = tp_cum / (tp_cum + fp_cum + 1e-8)
+
+    # 11-point interpolation AP
     ap = 0.0
-    for t in np.arange(0, 1.1, 0.1):
-        if np.sum(recalls >= t) == 0:
-            p = 0
-        else:
-            p = np.max(precisions[recalls >= t])
-        ap += p / 11.0
-    
-    return ap
+    for t in np.arange(0.0, 1.1, 0.1):
+        p = np.max(precisions[recalls >= t]) if np.any(recalls >= t) else 0.0
+        ap += float(p) / 11.0
+
+    return float(ap)
 
 
 def mean_average_precision(
@@ -126,10 +112,38 @@ def mean_average_precision(
     Returns:
         mAP score
     """
-    return calculate_ap_per_class(
-        pred_bboxes, pred_labels, pred_scores,
-        gt_bboxes, gt_labels, iou_threshold
-    )
+    # Compute per-class AP and average.
+    # Labels are assumed to be integer class indices (e.g., 0..C-1).
+    classes = set()
+    for labs in gt_labels:
+        classes.update(set(np.asarray(labs, dtype=np.int64).tolist()))
+    if len(classes) == 0:
+        return 0.0
+
+    aps: List[float] = []
+    for cls in sorted(classes):
+        cls_pred_bboxes: List[np.ndarray] = []
+        cls_pred_scores: List[np.ndarray] = []
+        cls_gt_bboxes: List[np.ndarray] = []
+
+        for i in range(len(gt_bboxes)):
+            # GT for class
+            gl = np.asarray(gt_labels[i], dtype=np.int64)
+            gb = np.asarray(gt_bboxes[i], dtype=np.float32)
+            gt_mask = (gl == cls)
+            cls_gt_bboxes.append(gb[gt_mask] if gb.size else np.zeros((0, 4), dtype=np.float32))
+
+            # Pred for class
+            pl = np.asarray(pred_labels[i], dtype=np.int64)
+            pb = np.asarray(pred_bboxes[i], dtype=np.float32)
+            ps = np.asarray(pred_scores[i], dtype=np.float32)
+            pred_mask = (pl == cls)
+            cls_pred_bboxes.append(pb[pred_mask] if pb.size else np.zeros((0, 4), dtype=np.float32))
+            cls_pred_scores.append(ps[pred_mask] if ps.size else np.zeros((0,), dtype=np.float32))
+
+        aps.append(calculate_ap(cls_pred_bboxes, cls_pred_scores, cls_gt_bboxes, iou_threshold=iou_threshold))
+
+    return float(np.mean(aps)) if aps else 0.0
 
 
 def average_precision_at_iou(

@@ -1,11 +1,10 @@
 #!/bin/bash
-# Testing/Inference launcher script
-# Loads a checkpoint, runs inference on test images, calculates metrics, and saves predictions
+# Testing/Inference launcher script (object detection)
+# Loads a checkpoint, runs inference on test images, calculates metrics, and saves predictions.json
 
 set -e
 
 CONFIG_DIR="configs/experiments"
-CHECKPOINT_DIR="outputs/experiments"
 OUTPUT_DIR="outputs/tests"
 
 if [ $# -eq 0 ]; then
@@ -18,9 +17,8 @@ if [ $# -eq 0 ]; then
     echo "What it does:"
     echo "  - Loads the trained model checkpoint"
     echo "  - Runs inference on test images"
-    echo "  - Calculates metrics (Dice, IoU, etc.) comparing predictions vs ground truth"
-    echo "  - Saves predicted masks to: outputs/tests/<experiment_name>/predictions/"
-    echo "  - Saves metrics to YAML files"
+    echo "  - Calculates detection metrics (e.g., mAP@0.5)"
+    echo "  - Saves predictions + metrics to: outputs/tests/<experiment_name>/predictions.json"
     echo ""
     echo "Available experiments:"
     ls -1 "$CONFIG_DIR"/*.yaml 2>/dev/null | xargs -n 1 basename | sed 's/.yaml//' || echo "  (none yet)"
@@ -33,10 +31,11 @@ if [ $# -eq 0 ]; then
 fi
 
 EXPERIMENT=$1
-CHECKPOINT_NAME=${2:-best}  # Default to 'best' if not provided
+CHECKPOINT_NAME=${2:-best}  # Default to 'best' if not provided (best|last)
 
 CONFIG_FILE="$CONFIG_DIR/${EXPERIMENT}.yaml"
-CHECKPOINT_FILE="$CHECKPOINT_DIR/${EXPERIMENT}/checkpoints/${CHECKPOINT_NAME}.pth"
+EXPERIMENT_OUTPUT_DIR=$(grep -E "^\s*dir:" "$CONFIG_FILE" | head -1 | sed 's/.*dir:\s*"\?\([^"]*\)"\?.*/\1/' | tr -d '"')
+CHECKPOINT_FILE="${EXPERIMENT_OUTPUT_DIR}/checkpoints/${CHECKPOINT_NAME}.pth"
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: Config file not found: $CONFIG_FILE"
@@ -67,7 +66,5 @@ echo "=========================================="
 echo "✓ Testing complete!"
 echo "=========================================="
 echo "Results saved to: $OUTPUT_DIR/$EXPERIMENT/"
-echo "  - Predicted masks: $OUTPUT_DIR/$EXPERIMENT/predictions/"
-echo "  - Metrics summary: $OUTPUT_DIR/$EXPERIMENT/test_metrics.yaml"
-echo "  - Per-image metrics: $OUTPUT_DIR/$EXPERIMENT/per_image_metrics.yaml"
+echo "  - Predictions + metrics: $OUTPUT_DIR/$EXPERIMENT/predictions.json"
 echo "=========================================="

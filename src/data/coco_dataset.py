@@ -29,8 +29,8 @@ class COCODataset(Dataset):
         Initialize COCO dataset.
         
         Args:
-            root_dir: Root directory containing train/val/test splits
-            split: "train", "val", or "test"
+            root_dir: Root directory containing train/val/test splits (or custom split names)
+            split: Split name (e.g., "train", "val", "test", or "train_patches", "val_patches", etc.)
             annotation_file: Path to COCO format JSON annotation file
             image_size: Optional target image size (H, W). If None, uses original size.
             mean: Normalization mean for RGB channels
@@ -47,7 +47,9 @@ class COCODataset(Dataset):
         self.normalize = normalize
         self.min_size = min_size
         self.augmentation = augmentation or {}
-        self.use_augmentation = self.augmentation.get('enabled', False) and self.split == 'train'
+        # Enable augmentation if enabled in config and split name contains 'train'
+        # This supports both 'train' and 'train_patches' etc.
+        self.use_augmentation = self.augmentation.get('enabled', False) and 'train' in self.split
         
         # Load annotations
         annotation_path = self.root_dir / split / annotation_file
@@ -71,7 +73,8 @@ class COCODataset(Dataset):
         self.image_ids = sorted(self.images.keys())
         
         # Filter out images with no annotations (or keep them for inference)
-        if split == 'train':
+        # Support both 'train' and 'train_patches' etc.
+        if 'train' in split:
             self.image_ids = [img_id for img_id in self.image_ids if img_id in self.image_to_anns]
         
         print(f"Loaded {len(self.image_ids)} images for {split} split")

@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Queue multiple training experiments to run sequentially
-# Usage: ./queue.sh exp001_basic_unet exp002_roinet exp003_utrans
+# Usage: ./queue.sh exp_cfinet_soda exp_cfinet_soda_patches
 
 if [ $# -eq 0 ]; then
     echo "Usage: ./queue.sh <experiment1> <experiment2> ..."
     echo ""
     echo "Example:"
-    echo "  ./queue.sh exp001_basic_unet exp002_roinet"
+    echo "  ./queue.sh exp_cfinet_soda exp_cfinet_soda_patches"
     echo ""
     echo "Available experiments:"
     ls configs/experiments/*.yaml 2>/dev/null | xargs -n 1 basename | sed 's/.yaml$//'
